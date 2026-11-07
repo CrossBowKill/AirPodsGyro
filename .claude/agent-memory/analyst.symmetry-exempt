@@ -1,0 +1,22 @@
+# Analyst specialist layer: the research swarm shares agent-memory/research-swarm/
+# (one collective memory for the pipeline) instead of per-agent MEMORY.md.
+bear
+bull
+competitor-agent
+contradiction-detector
+customer-demand-agent
+distribution-channel-agent
+evidence-integrator
+market-size-agent
+moat-agent
+pricing-strategy-agent
+red-team
+regulatory-compliance-agent
+research-analyst
+research-sensor
+research-strategist
+research-synthesizer
+risk-assessment-agent
+tool-ecosystem-agent
+trend-agent
+unit-economics-agent

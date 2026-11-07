@@ -1,0 +1,2 @@
+- `2026-11-05 23:41:45` | Edit | D:\.coding\AirPodsGyro\CLAUDE.md
+- `2026-11-05 23:52:49` | Write | D:\.coding\AirPodsGyro\tools\ubuntu-pro3-check.sh

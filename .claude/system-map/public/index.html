@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>System Map</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="campus">
+<header id="topbar">
+  <div class="brand">
+    <img src="logo.svg" alt="" width="26" height="26">
+    <span class="word">Claudify</span>
+    <h1>System Map</h1>
+  </div>
+  <div id="mascot" aria-hidden="true"></div>
+  <nav id="crumb" class="crumb" aria-label="Where you are"></nav>
+  <input id="search" type="search" placeholder="Find an agent, command or skill" aria-label="Find an agent, command or skill" autocomplete="off" spellcheck="false">
+  <div id="live" class="live off" title="This map updates when files in this project change">Reading files</div>
+</header>
+
+<main id="stage">
+  <div id="signs"></div>
+  <section id="hud" aria-label="System health"></section>
+  <div id="tools">
+    <button id="up" class="btn" title="Go back (Esc)">Back</button>
+    <button id="fit" class="btn" title="Fit this view to the screen">Fit</button>
+  </div>
+  <div id="tooltip"></div>
+</main>
+
+<aside id="side" aria-label="Details">
+  <button id="close" class="closer" title="Close" aria-label="Close">Close</button>
+  <nav class="tabs">
+    <button data-tab="detail" class="on">Details</button>
+    <button data-tab="flags">Flags <span id="flagcount"></span></button>
+    <button data-tab="steps">Next steps <span id="stepcount"></span></button>
+  </nav>
+  <section id="tab-detail" class="tab on"></section>
+  <section id="tab-flags" class="tab"></section>
+  <section id="tab-steps" class="tab"></section>
+</aside>
+
+<footer id="timeline">
+  <button id="play" class="btn small" title="Replay the last 7 days, one hour per second (space)">Play</button>
+  <button id="livebtn" class="btn small on" title="Return to now">Now</button>
+  <div class="scrubwrap">
+    <canvas id="histo" class="histo"></canvas>
+    <input id="scrub" type="range" min="0" max="1000" value="1000" step="1" aria-label="Scrub through the last 7 days">
+  </div>
+  <div id="timelabel" class="timelabel">now</div>
+</footer>
+<div id="ticker"><div id="tickerlist"></div></div>
+
+<script src="vendor/pixi.min.js" integrity="sha384-sQhAUuZTvdanRcBHbVCTasnEWH28GGEK87FJGPj/JaqwL/15KWQwKe7whTHdCkwm"></script>
+<script src="layout.js"></script>
+<script src="art.js"></script>
+<script src="campus.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Content specialist layer: these pipeline agents share the newsletter/content
+# foundation files and orchestrator memory instead of per-agent MEMORY.md.
+analyst
+content-auditor
+drafter
+newsletter-auditor
+prompt-architect
+stylist

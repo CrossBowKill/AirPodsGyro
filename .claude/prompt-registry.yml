@@ -1,0 +1,92 @@
+# Prompt Registry
+# Shared knowledge base for prompt compilation (/enhance) and the refinement loop
+# (the prompt-compilation skill). Every entry describes what one installed agent
+# needs from a prompt: requirements, known failure modes, and effective patterns.
+#
+# Rules:
+# - Entries describe agents that exist in .claude/agents/. When you add an agent,
+#   add an entry here the first time you build a serious prompt for it.
+# - /enhance reads this file on every run. The refinement loop reads AND writes it.
+# - The calibration cycle (see the prompt-compilation skill) prunes stale entries
+#   and updates last_calibrated. Nothing else deletes from this file.
+#
+# The three entries below are worked examples showing the schema. Replace them with
+# entries for your own agents as you build prompts for them.
+
+registry_version: 1
+last_calibrated: null
+calibration_interval_days: 14
+
+agents:
+
+  # Example 1: a research-style agent (web search, returns findings)
+  research-agent-example:
+    purpose: "Finds and summarises external evidence on a stated question, with sources"
+    prompt_requirements:
+      must_include:
+        - Explicit scope (topic, geography or market, and time window)
+        - The current year in any search-driven instruction
+        - "Report the source and date for every number" as an explicit instruction
+      must_avoid:
+        - Vague scope words ("global", "AI tools") that make results unfalsifiable
+        - Asking for recommendations (research agents return evidence, not opinions)
+      output_format: "Structured markdown: Findings (value/source/date per item), Gaps, Confidence"
+      known_failure_modes:
+        - "Defaults to US or global data when geography is ambiguous"
+        - "Reports stale numbers without flagging the year"
+      effective_patterns:
+        - "Naming 2-3 example sources or competitors in the prompt improves recall for the rest"
+        - "A hard cap on result count keeps the agent focused"
+    performance:
+      times_used: 0
+      success_rate: null
+      last_calibrated: null
+      failure_log: []
+
+  # Example 2: a review/audit-style agent (reads work, returns a verdict)
+  reviewer-agent-example:
+    purpose: "Reviews a piece of work against explicit criteria and returns PASS/FAIL with fixes"
+    prompt_requirements:
+      must_include:
+        - The exact artifact to review (file path or pasted content, never "recent work")
+        - The criteria list or rubric to judge against
+        - The required verdict format (PASS/FAIL plus a numbered fix list)
+      must_avoid:
+        - Asking it to fix the work itself (review and repair are separate passes)
+        - Open-ended "any thoughts?" framing (produces vague commentary, not a verdict)
+      output_format: "Verdict line (PASS or FAIL), then numbered findings each with location and concrete fix"
+      known_failure_modes:
+        - "Softens FAIL into 'mostly fine' when no explicit verdict format is demanded"
+        - "Reviews style instead of the stated criteria when the rubric is omitted"
+      effective_patterns:
+        - "Fresh-context review (a separate agent, not the author) catches author blind spots"
+        - "Severity-ranking the findings makes the fix list actionable"
+    performance:
+      times_used: 0
+      success_rate: null
+      last_calibrated: null
+      failure_log: []
+
+  # Example 3: a writer-style agent (produces a deliverable document)
+  writer-agent-example:
+    purpose: "Produces a finished written deliverable (report, brief, docs) from supplied inputs"
+    prompt_requirements:
+      must_include:
+        - The audience and what decision or action the document serves
+        - Length or depth budget (word count or section list)
+        - All source material inline or by file path (the writer should not research)
+      must_avoid:
+        - Mixing research and writing in one prompt (split into two passes)
+        - Unstated tone requirements (state the voice explicitly or accept the default)
+      output_format: "The deliverable itself, ready to use, with no meta-commentary before or after"
+      known_failure_modes:
+        - "Pads with generic framing when the input material is thin, instead of flagging the gap"
+        - "Invents facts to fill required sections when sources are missing"
+      effective_patterns:
+        - "'If a required input is missing, stop and list what is missing' prevents invention"
+        - "A skeleton of required headings produces more consistent structure than prose instructions"
+    performance:
+      times_used: 0
+      success_rate: null
+      last_calibrated: null
+      failure_log: []

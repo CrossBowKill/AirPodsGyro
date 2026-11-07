@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="brand-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5070f7"/>
+      <stop offset="100%" stop-color="#18b4cc"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="#0a0a12"/>
+
+  <!-- Layer 4 (bottom, faintest) -->
+  <path d="M256 400 L400 328 L256 256 L112 328 Z" fill="url(#brand-gradient)" opacity="0.2"/>
+
+  <!-- Layer 3 -->
+  <path d="M256 344 L400 272 L256 200 L112 272 Z" fill="url(#brand-gradient)" opacity="0.4"/>
+
+  <!-- Layer 2 -->
+  <path d="M256 288 L400 216 L256 144 L112 216 Z" fill="url(#brand-gradient)" opacity="0.65"/>
+
+  <!-- Layer 1 (top, brightest) -->
+  <path d="M256 232 L400 160 L256 88 L112 160 Z" fill="url(#brand-gradient)" opacity="1"/>
+
+  <!-- Top face highlight -->
+  <path d="M256 88 L112 160 L256 232 L400 160 Z" stroke="#e0e0e8" stroke-width="2.5" fill="none" opacity="0.15"/>
+</svg>

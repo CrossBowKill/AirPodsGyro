@@ -1,0 +1,13 @@
+id: community-evidence-extraction-001
+skill: analyst/community-evidence-extraction
+input: >
+  We exported 80 posts and their comments from a members-only community about agency
+  pricing. Turn them into graded evidence cards we can cite in a pricing research run,
+  and tell us how to know the synthesis is not making numbers up.
+checks:
+  required_sections: ["Audit everything", "Repair with verification", "grounding check", "Output"]
+  required_patterns: ["grounding-check.mjs", "client result", "numeric", "repaired"]
+  banned_patterns: ["\\[insert", "structured process, quality checks", "\\u2014"]
+  min_words: 400
+  max_placeholder_ratio: 0.05
+  format: markdown

@@ -1,0 +1,43 @@
+[Unit]
+Description=pods-head-tracker: AirPods -> OpenTrack head-tracking bridge
+# Wait for Bluetooth and the network before starting; the bridge itself
+# retries the AirPods connection, so an early start just loops until the
+# buds are in range / in-ear.
+After=bluetooth.target network-online.target
+Wants=bluetooth.target network-online.target
+# Ordering-only, on purpose: on USB-audio installs the composite gadget
+# creates /dev/ttyGS0, so start after it. On serial-only (g_serial) installs
+# no such unit exists and this line is inert -- and the bridge re-opens the
+# port every second anyway, so it's a nicety, not a requirement.
+After=pods-usb-gadget.service
+# Never give up restarting (default rate-limiting would stop it after a few
+# fast failures, e.g. AirPods not yet reachable at boot).
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Needs root for the raw AF_BLUETOOTH L2CAP socket + BT_SECURITY.
+User=root
+# All settings (AirPods MAC, transport, PC IP, ...) live in
+# /etc/pods-head-tracker.conf -- copy the shipped .example there and edit
+# it; never edit this unit. Deliberately not "EnvironmentFile=-": a missing
+# config should fail the unit with a clear journal message, not start the
+# bridge half-configured.
+EnvironmentFile=/etc/pods-head-tracker.conf
+ExecStart=/usr/bin/python3 /usr/local/bin/opentrack_bridge.py
+Restart=always
+RestartSec=5
+# Cheap sandboxing: the bridge only reads /usr and writes /dev/ttyGS0 plus
+# its sockets, so lock the rest down. Deliberately conservative -- e.g. no
+# PrivateDevices, which would hide the gadget port.
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectSystem=full
+# Let the bridge publish a live "Status:" line (state + AirPods battery)
+# via sd_notify. Type stays "simple" on purpose: STATUS= needs only this
+# access grant, and startup semantics stay unchanged. If sandboxing ever
+# grows RestrictAddressFamilies, it must include AF_UNIX for this.
+NotifyAccess=main
+
+[Install]
+WantedBy=multi-user.target

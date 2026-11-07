@@ -1,0 +1,87 @@
+# pods-head-tracker configuration.
+#
+# Copy this file to the Pi as /etc/pods-head-tracker.conf and edit it:
+#   sudo install -m 644 pods-head-tracker.conf.example /etc/pods-head-tracker.conf
+#   sudo nano /etc/pods-head-tracker.conf
+# The systemd service reads it on start; apply changes with:
+#   sudo systemctl restart pods-head-tracker
+
+# Your AirPods' Bluetooth *Classic* MAC -- the address you paired in
+# bluetoothctl (not the LE address).
+AIRPODS_MAC=XX:XX:XX:XX:XX:XX
+
+# How tracking data reaches the PC: udp (Wi-Fi), serial (USB cable), or both.
+TRANSPORT=udp
+
+# --- udp transport (OpenTrack input: "FreePIE UDP receiver") ---
+# Your PC's LAN IP and OpenTrack's listen port.
+UDP_HOST=192.0.2.10
+UDP_PORT=4242
+
+# --- serial transport (OpenTrack input: "Hatire Arduino") ---
+# USB gadget serial device, created by setup-usb-serial.sh. Leave as-is.
+SERIAL_DEV=/dev/ttyGS0
+
+# --- head-tracking start command ---
+# Which START packet begins the sensor stream: alt (the default; confirmed
+# on AirPods 4 ANC), def (the LibrePods variant; some other models need
+# it), or both (send alt and def alternately until data arrives).
+# Set "both" if the journal shows "no data - re-sent start" continuously
+# while the buds are in your ears. The journal then shows which variant
+# your model answered ("stream started after start ...").
+#HT_START=alt
+
+# --- USB audio (optional; installed by setup-usb-audio.sh) ---
+# The audio forwarder reuses AIRPODS_MAC above -- nothing extra is required.
+# 0 = head tracking only: the audio services stay installed but idle.
+# Apply with: sudo systemctl restart pods-usb-audio
+#AUDIO_ENABLE=1
+# Loop latency in milliseconds: lower = snappier audio, higher = fewer
+# dropouts. 50 is the safe default; 20 tested clean on a Pi Zero 2 W with
+# tracking active. Apply with: sudo systemctl restart pods-usb-audio
+#AUDIO_LATENCY_MS=50
+
+# The buds' Bluetooth volume ceiling, 0-127. Day-to-day loudness is the
+# normal Windows volume slider; raise this only if audio feels capped.
+#AUDIO_VOLUME=70
+
+# Re-zero the neutral ("facing forward") pose every N seconds (0 = only when
+# the connection opens; see the on-demand re-centering below).
+RECALIBRATE_SECS=0
+
+# --- on-demand re-centering (no restart needed) ---
+# On the serial transport the bridge re-centers by itself every time the
+# PC (re)starts reading the COM port -- i.e. every time you press Start in
+# OpenTrack. 0 = off. (UDP can't detect this: FreePIE is receive-only.)
+#RECENTER_ON_START=1
+# Re-center any time, on any transport, with:
+#   sudo systemctl kill --signal=SIGUSR1 pods-head-tracker
+# OpenTrack can also send the token below over the COM port (Hatire
+# dialog: put it in "Reset command" for the Reset button, or type it in
+# the Send box). Matched as raw bytes in the serial stream; empty = off.
+#RECENTER_CMD=RECENTER
+
+# --- roll ---
+# 1 = derive and send the roll axis (head tilt, ear to shoulder).
+# Confirmed on AirPods 4 (ANC). On another model, verify it one time with
+# the probe protocol in the README's roll section. 0 = roll is sent as 0.
+#ROLL=0
+
+# --- ear detection ---
+# 1 = freeze the pose while no bud is in an ear. Pulling the buds out is
+# itself head motion; without the freeze that garbage reaches the game.
+# The last pose is held until the buds return.
+#EAR_PAUSE=1
+# 1 = re-capture the neutral pose when the buds return to the ears
+# (re-seating a bud moves the sensor -- face forward as you put them in).
+#EAR_RECENTER=1
+
+# --- battery reporting (journal + systemctl status) ---
+# Re-log the battery every N seconds even if unchanged (changes always log;
+# 0 = changes only).
+#BATTERY_LOG_SECS=900
+# Warn when a bud discharges to this percentage (0 = never).
+#BATTERY_WARN_PCT=20
+
+# 1 = log every sample (noisy; debugging only).
+VERBOSE=0

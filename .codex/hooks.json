@@ -1,0 +1,170 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\guard-bash.sh'",
+            "statusMessage": "Checking command safety..."
+          },
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\safe-run.sh'",
+            "statusMessage": "Snapshotting reversible commands..."
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\completeness-gate.sh'",
+            "statusMessage": "Validating content completeness..."
+          },
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\newsletter-em-dash-check.sh'",
+            "statusMessage": "Newsletter voice gate: em-dash check..."
+          },
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\newsletter-jargon-check.sh'",
+            "statusMessage": "Newsletter voice gate: jargon check..."
+          },
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\newsletter-schema-check.sh'",
+            "statusMessage": "Newsletter schema gate..."
+          },
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\newsletter-contrast-check.sh'",
+            "statusMessage": "Newsletter contrast gate (MISTAKE-005)..."
+          },
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\newsletter-paragraph-collapse-check.sh'",
+            "statusMessage": "Newsletter rendering gate: paragraph collapse (MISTAKE-018)..."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\pre-compact-handoff.sh'",
+            "timeout": 5,
+            "statusMessage": "Saving state before compaction..."
+          }
+        ]
+      },
+      {
+        "matcher": "manual",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\pre-compact-handoff.sh'",
+            "timeout": 5,
+            "statusMessage": "Saving state before compaction..."
+          },
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\validate-handoff.sh'",
+            "timeout": 5,
+            "statusMessage": "Validating the session handoff..."
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\post-compact.sh'",
+            "timeout": 10,
+            "statusMessage": "Restoring context after compaction..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\session-reset.sh'",
+            "timeout": 3,
+            "statusMessage": "Resetting session state..."
+          },
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\check-agent-memory-symmetry.sh'",
+            "timeout": 3,
+            "statusMessage": "Checking agent-memory symmetry..."
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\post-compact-resume.sh'",
+            "timeout": 10,
+            "statusMessage": "Restoring context after compaction..."
+          },
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\inject-related-context.sh'",
+            "timeout": 5,
+            "statusMessage": "Surfacing related context..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\auto-load-topics.sh'",
+            "timeout": 5,
+            "statusMessage": "Loading relevant context..."
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\subagent-mandatory-reads.sh'",
+            "timeout": 5,
+            "statusMessage": "Injecting mandatory reads..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'d:\\.coding\\AirPodsGyro\\.codex\\hooks\\check-quality-gate.sh'",
+            "timeout": 3,
+            "statusMessage": "Checking context quality tier..."
+          }
+        ]
+      }
+    ]
+  }
+}
