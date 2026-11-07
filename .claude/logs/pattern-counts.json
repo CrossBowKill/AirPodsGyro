@@ -1,0 +1,12 @@
+{
+  "bash_exit_code_2_": {
+    "count": 1,
+    "last_seen": "2026-11-07 02:18:29",
+    "category": "OTHER",
+    "severity": "ERROR",
+    "tool": "Bash",
+    "sample_error": "Exit code 2",
+    "first_seen": "2026-11-07 02:18:29",
+    "flagged": false
+  }
+}
