@@ -1,8 +1,0 @@
-# SEO specialist layer: these agents share the agent-memory/seo/ memory files
-# instead of per-agent MEMORY.md (shared-memory pipeline design).
-content-optimizer
-geo-agent
-keyword-strategist
-link-builder
-seo-agent
-seo-auditor
