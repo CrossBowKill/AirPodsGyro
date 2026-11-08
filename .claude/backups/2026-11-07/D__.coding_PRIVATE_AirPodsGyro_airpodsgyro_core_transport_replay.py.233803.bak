@@ -1,0 +1,82 @@
+"""Replay transport: plays a recorded soak.csv back as real SensorDataWX packets.
+
+The packets are re-encoded from the CSV and go through the same parser as live data, so the whole
+pipeline (protocol -> session -> tracker -> filters -> outputs) runs with no hardware. Used by the
+tests and by the GUI before the Windows driver exists.
+
+speed: 1.0 = real time, 0 = as fast as possible. Rows without a quaternion are kept (as on the wire).
+"""
+
+import csv
+import time
+
+from .. import protocol
+from .base import Transport, TransportError
+
+
+def read_soak_csv(path):
+    """[(host_t, ts_ns, gyro, gravity, quat|None)] from a bridge.py soak CSV."""
+    rows = []
+    with open(path, newline="") as f:
+        for r in csv.DictReader(f):
+            q = None
+            if r["qw"]:
+                q = (float(r["qw"]), float(r["qx"]), float(r["qy"]), float(r["qz"]))
+            rows.append((float(r["host_t"]), int(r["ts_ns"]),
+                         (float(r["gx"]), float(r["gy"]), float(r["gz"])),
+                         (float(r["ax_g"]), float(r["ay_g"]), float(r["az_g"])), q))
+    return rows
+
+
+class ReplayTransport(Transport):
+    simulated = True
+
+    def __init__(self, path_or_rows, speed=1.0, per_packet=1, loop=False, pid="2027"):
+        self.rows = read_soak_csv(path_or_rows) if isinstance(path_or_rows, str) else list(path_or_rows)
+        if not self.rows:
+            raise ValueError("empty recording")
+        self.speed, self.per_packet, self.loop, self.pid = speed, max(1, per_packet), loop, pid
+        self.i = 0
+        self.is_open = False
+        self.sent = []                       # packets the session sent (for tests)
+        self.t0_wall = self.t0_rec = None
+
+    def open(self, addr):
+        self.is_open = True
+        self.t0_wall, self.t0_rec = time.monotonic(), self.rows[self.i][0]
+        return "replay" if addr == "auto" else addr
+
+    def now(self):
+        return self.t_now if self.t_now is not None else self.rows[0][0]
+
+    def product_id(self):
+        return self.pid
+
+    def send(self, pkt):
+        if not self.is_open:
+            raise TransportError("not open")
+        self.sent.append(pkt)
+
+    def recv(self, timeout):
+        if not self.is_open:
+            raise TransportError("not open")
+        if self.i >= len(self.rows):
+            if not self.loop:
+                raise EOFError("end of recording")
+            self.i = 0
+            self.t0_wall, self.t0_rec = time.monotonic(), self.rows[0][0]
+        chunk = self.rows[self.i:self.i + self.per_packet]
+        if self.speed > 0:
+            due = self.t0_wall + (chunk[-1][0] - self.t0_rec) / self.speed
+            wait = due - time.monotonic()
+            if wait > timeout:
+                time.sleep(timeout)
+                return None
+            if wait > 0:
+                time.sleep(wait)
+        self.i += len(chunk)
+        self.t_now = chunk[-1][0]
+        return protocol.encode_wx_packet([protocol.encode_block(r[1], r[2], r[3], r[4]) for r in chunk])
+
+    def close(self):
+        self.is_open = False

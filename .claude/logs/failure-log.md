@@ -1,1 +1,4 @@
 - `2026-11-07 02:18:29` | ERROR | OTHER | Bash | Exit code 2
+- `2026-11-07 23:36:24` | CRITICAL | OTHER | Bash | Exit code 128
+- `2026-11-07 23:39:12` | ERROR | OTHER | Bash | Exit code 1
+- `2026-11-07 23:52:08` | ERROR | OTHER | Bash | Exit code 4

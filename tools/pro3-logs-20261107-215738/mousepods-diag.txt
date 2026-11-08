@@ -1,0 +1,7 @@
+22:00:12 INFO Démarrage — mode DIAGNOSTIC, source auto
+22:00:13 INFO Canal AAP ouvert avec 34:0E:22:54:5B:C4 (modèle 2027)
+22:00:13 WARNING Profil 2027_head non calibré : lance --calibrate dans cette position
+22:00:17 INFO Pas de données de mouvement — relance du flux
+22:00:21 INFO Pas de données de mouvement — relance du flux
+22:00:25 INFO Pas de données de mouvement — relance du flux
+22:00:29 INFO Pas de données de mouvement — relance du flux

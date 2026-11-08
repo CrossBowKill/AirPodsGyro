@@ -1,0 +1,1 @@
+VERDICT: SUCCESS: AirPods Pro 3 stream head-tracking data over BlueZ (probe packets=0, raw@2582=74, raw@672=87). The protocol works; the Windows driver route is worth building.

@@ -1,0 +1,38 @@
+"""Transport interface: one AAP L2CAP channel (PSM 0x1001) to the AirPods, as raw packets.
+
+Implementations: bluez.BluezTransport (Linux), replay.ReplayTransport (recorded data, no hardware),
+windriver (Windows, via our KMDF driver, later).
+"""
+
+import time
+
+
+class TransportError(OSError):
+    """Link lost or could not be opened. The session reconnects after it."""
+
+
+class Transport:
+    #: True when packets come from a recording (the session skips handshake pauses).
+    simulated = False
+
+    def open(self, addr):
+        """Open the channel. addr = 'AA:BB:CC:DD:EE:FF' or 'auto'. Returns the address used."""
+        raise NotImplementedError
+
+    def now(self):
+        """Clock for timing statistics (seconds). Replay returns the recorded time."""
+        return time.monotonic()
+
+    def product_id(self):
+        """Bluetooth product ID as 4 hex digits, e.g. '2027' for AirPods Pro 3, or '0000' if unknown."""
+        return "0000"
+
+    def send(self, pkt):
+        raise NotImplementedError
+
+    def recv(self, timeout):
+        """Next packet, or None if nothing arrived within timeout seconds. Raises TransportError on loss."""
+        raise NotImplementedError
+
+    def close(self):
+        raise NotImplementedError

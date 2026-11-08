@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+"""AirPodsGyro bridge (CLI): AirPods Pro 3 head tracking -> OpenTrack (FreePIE UDP).
+
+    sudo python3 airpodsgyro/bridge.py calibrate            # once: 3 held poses (Linux, live AirPods)
+    sudo python3 airpodsgyro/bridge.py run [--host IP]      # stream to OpenTrack, Enter = recenter
+    sudo python3 airpodsgyro/bridge.py soak --minutes 10    # long test: rate, dropouts, drift, CSV
+    python airpodsgyro/bridge.py --replay tools/soak-20261107-225643/soak.csv soak --speed 0
+                                                            # same pipeline on a recording, no hardware
+
+Thin command-line front end over core/ (protocol, transports, session, head-tracking math), which the
+GUI uses too. Always stops the sensor stream on exit (svc 16 -> 0).
+"""
+
+import argparse
+import collections
+import csv
+import json
+import math
+import os
+import signal
+import statistics
+import sys
+import threading
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+from core import headtrack as ht  # noqa: E402
+from core.filters import OneEuro  # noqa: E402
+from core.session import Session  # noqa: E402
+from core.transport import make_transport  # noqa: E402
+
+CALIB_PATH = os.path.join(HERE, "calibration.json")
+
+
+def make_session(args, **kw):
+    if args.replay:
+        factory = lambda: make_transport("replay", path=args.replay, speed=args.speed)  # noqa: E731
+    else:
+        factory = lambda: make_transport("bluez")  # noqa: E731
+
+    def status(state, detail=""):
+        print(f"
+[{state}] {detail}" if state != "streaming" else f"connected to {detail}", flush=True)
+
+    return Session(factory, args.addr, args.interval_us, on_status=status, **kw)
+
+
+def load_calib(path):
+    if not os.path.exists(path):
+        sys.exit(f"no calibration at {path} - run:  sudo python3 {sys.argv[0]} calibrate")
+    with open(path) as f:
+        return json.load(f)
+
+
+# ----------------------------------------------------------------------------- calibrate
+
+
+def cmd_calibrate(args):
+    st = make_session(args)
+    recent = collections.deque(maxlen=400)
+
+    def reader():
+        try:
+            for s in st.samples():          # ends (with a clean stream stop) after st.stop()
+                recent.append(s)
+        except Exception as e:  # surface reader crashes instead of hanging the prompts
+            print(f"reader stopped: {e}", flush=True)
+
+    th = threading.Thread(target=reader, daemon=True)
+    th.start()
+
+    def hold(prompt):
+        while True:
+            input(f"\n>>> {prompt}, hold it, then press Enter ")
+            time.sleep(0.3)
+            t0 = time.monotonic()
+            time.sleep(0.8)
+            win = [s for s in list(recent) if s[0] >= t0 and s[4] is not None]
+            if len(win) < 20:
+                print(f"   only {len(win)} samples - are the AirPods in your ears and streaming? try again")
+                continue
+            rng = max(max(s[2][k] for s in win) - min(s[2][k] for s in win) for k in range(3))
+            if rng > 15:
+                print(f"   moving too much (gyro range {rng:.0f} deg/s) - hold still and try again")
+                continue
+            g = tuple(sum(s[3][k] for s in win) / len(win) for k in range(3))
+            return g, ht.quat_avg([s[4] for s in win])
+
+    print("Calibration: sit normally, AirPods in both ears.")
+    try:
+        g_fwd, q_fwd = hold("Look straight at your monitor")
+        _, q_down = hold("Look DOWN about 30 deg (chin toward chest)")
+        _, q_left = hold("Look straight again, then turn your head LEFT about 30 deg")
+        cal = ht.solve_calibration(g_fwd, q_fwd, q_down, q_left)
+    except ValueError as e:
+        sys.exit(f"calibration failed: {e} - run calibrate again")
+    finally:
+        st.stop()
+        th.join(timeout=3)
+    cal.update({"pid": st.pid, "created": time.strftime("%Y-%m-%d %H:%M:%S")})
+    with open(args.calib, "w") as f:
+        json.dump(cal, f, indent=2)
+    print(f"\nsaved {args.calib}  quality={cal['quality']}")
+    print("Note: if the primary bud changes (one bud removed/reinserted), recalibrate.")
+
+
+# ----------------------------------------------------------------------------- run
+
+
+def cmd_run(args):
+    from outputs.udp import UdpOutput
+    tracker = ht.HeadTracker(load_calib(args.calib))
+    out = UdpOutput(args.host, args.port)
+    filt = [OneEuro(args.mincutoff, args.beta) for _ in range(3)]
+    sign = (-1 if args.invert_yaw else 1, -1 if args.invert_pitch else 1, -1 if args.invert_roll else 1)
+    if hasattr(signal, "SIGUSR1"):
+        signal.signal(signal.SIGUSR1, lambda *_: tracker.recenter())
+
+    def keys():
+        for _ in sys.stdin:
+            tracker.recenter()
+            print("\n[recenter]", flush=True)
+
+    if sys.stdin.isatty():
+        threading.Thread(target=keys, daemon=True).start()
+    print(f"sending FreePIE UDP to {args.host}:{args.port}  (Enter or SIGUSR1 = recenter, Ctrl+C = quit)")
+    st = make_session(args)
+    gen = st.samples()
+    last_ts, next_print, cnt = None, 0.0, 0
+    try:
+        for now, ts, w, g, q in gen:
+            ang = tracker.update(q)
+            if ang is None:
+                continue
+            dt = (ts - last_ts) / 1e9 if last_ts else 0.0
+            dt = dt if 0.0 < dt < 0.2 else 1.0 / (1e6 / args.interval_us)
+            last_ts = ts
+            y, p, r = (f(a * s, dt) for f, a, s in zip(filt, ang, sign))
+            out.send(y, p, r)
+            cnt += 1
+            if now >= next_print:
+                print(f"\ryaw {y:+7.1f}  pitch {p:+7.1f}  roll {r:+7.1f}   {cnt * 2:4d} Hz  "
+                      f"gaps {sum(st.gaps.values())}  ", end="", flush=True)
+                cnt, next_print = 0, now + 0.5
+    except KeyboardInterrupt:
+        pass
+    finally:
+        gen.close()                         # runs the session's clean stop
+        print("\n" + json.dumps(st.stats()))
+
+
+# ----------------------------------------------------------------------------- soak
+
+
+def cmd_soak(args):
+    calib = load_calib(args.calib) if os.path.exists(args.calib) else None
+    tracker = ht.HeadTracker(calib) if calib else None
+    os.makedirs(args.out, exist_ok=True)
+    csv_path = os.path.join(args.out, "soak.csv")
+    st = make_session(args)
+    gen = st.samples()
+    t_end = t_still_end = None          # set from the first sample's clock (recorded time on replay)
+    still = []                        # (t, total rel-rotation deg, yaw deg|None) during the still phase
+    conv_body, conv_world = [], []
+    prev = collections.deque(maxlen=4)
+    r_first, next_report, win_n = None, None, 0
+    print(f"soak: {args.minutes} min, first {args.still_minutes} min HEAD STILL facing the monitor; "
+          f"then use it normally. CSV -> {csv_path}", flush=True)
+    with open(csv_path, "w", newline="") as f:
+        wcsv = csv.writer(f)
+        wcsv.writerow(["host_t", "ts_ns", "gx", "gy", "gz", "ax_g", "ay_g", "az_g",
+                       "qw", "qx", "qy", "qz", "yaw", "pitch", "roll"])
+        try:
+            for now, ts, w, g, q in gen:
+                if t_end is None:
+                    t_end, t_still_end, next_report = now + args.minutes * 60, now + args.still_minutes * 60, now + 30
+                ang = tracker.update(q) if tracker else None
+                wcsv.writerow([f"{now:.4f}", ts, *(f"{c:.2f}" for c in w), *(f"{c:.0f}" for c in g),
+                               *((f"{c:.5f}" for c in q) if q else ("",) * 4),
+                               *((f"{a:.2f}" for a in ang) if ang else ("",) * 3)])
+                win_n += 1
+                if q is not None:
+                    r = ht.quat_to_mat(q)
+                    if r_first is None:
+                        r_first = r
+                    if now < t_still_end:
+                        _, tot = ht.rotation_axis_angle(ht.mat_mul(ht.mat_T(r_first), r))
+                        still.append((now, tot, ang[0] if ang else None))
+                    prev.append((q, w))
+                    if len(prev) == 4:
+                        _quat_vs_gyro(prev[0][0], prev[-1][0], prev[1][1], conv_body, conv_world)
+                if now >= next_report:
+                    phase = "STILL" if now < t_still_end else "free"
+                    a = f"  yaw {ang[0]:+6.1f} pitch {ang[1]:+6.1f} roll {ang[2]:+6.1f}" if ang else ""
+                    print(f"[{time.strftime('%H:%M:%S')}] {phase}  {win_n / 30:5.1f} Hz  "
+                          f"gaps {dict(st.gaps)}  max {st.max_gap * 1000:.0f} ms  restarts {st.restarts}  "
+                          f"reconnects {st.reconnects}{a}", flush=True)
+                    win_n, next_report = 0, now + 30
+                if now >= t_end:
+                    break
+        except KeyboardInterrupt:
+            print("\ninterrupted - writing summary")
+        finally:
+            gen.close()
+    summary = {"minutes_planned": args.minutes, "interval_us": args.interval_us, **st.stats(),
+               "calibrated": bool(calib)}
+    if still and still[-1][0] - still[0][0] > 20:
+        span_min = (still[-1][0] - still[0][0]) / 60
+        summary["still_phase"] = {"minutes": round(span_min, 2),
+                                  "total_rotation_end_deg": round(still[-1][1], 2),
+                                  "drift_deg_per_min": round(still[-1][1] / span_min, 2)}
+        if still[-1][2] is not None:
+            summary["still_phase"]["yaw_end_deg"] = round(still[-1][2], 2)
+    if len(conv_body) >= 20:
+        summary["quat_convention_check"] = {"moving_windows": len(conv_body),
+                                            "body_frame_cos_median": round(statistics.median(conv_body), 3),
+                                            "world_frame_cos_median": round(statistics.median(conv_world), 3),
+                                            "expect": "body_frame close to 1.0"}
+    with open(os.path.join(args.out, "soak-summary.json"), "w") as f:
+        json.dump(summary, f, indent=2)
+    print(json.dumps(summary, indent=2))
+
+
+def _quat_vs_gyro(q0, q1, w, body, world):
+    """Compare the quaternion's rotation axis with the gyro axis (only while turning > 30 deg/s)."""
+    wn = math.sqrt(sum(c * c for c in w))
+    if wn < 30:
+        return
+    wu = tuple(c / wn for c in w)
+    r0, r1 = ht.quat_to_mat(q0), ht.quat_to_mat(q1)
+    for rel, sink in ((ht.mat_mul(ht.mat_T(r0), r1), body), (ht.mat_mul(r1, ht.mat_T(r0)), world)):
+        axis, ang = ht.rotation_axis_angle(rel)
+        if axis is not None and ang > 0.2:
+            sink.append(ht.vdot(axis, wu))
+
+
+# ----------------------------------------------------------------------------- main
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--addr", default="auto", help="AirPods MAC (default: auto-detect paired AirPods)")
+    ap.add_argument("--interval-us", type=int, default=10000, help="sensor interval, 10000 = 100 Hz")
+    ap.add_argument("--calib", default=CALIB_PATH)
+    ap.add_argument("--replay", metavar="CSV", help="play a recorded soak.csv instead of live AirPods")
+    ap.add_argument("--speed", type=float, default=1.0, help="replay speed, 0 = as fast as possible")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("calibrate", help="learn the head frame from 3 held poses")
+    r = sub.add_parser("run", help="stream head angles to OpenTrack (FreePIE UDP)")
+    r.add_argument("--host", default="127.0.0.1")
+    r.add_argument("--port", type=int, default=4242)
+    r.add_argument("--mincutoff", type=float, default=1.5, help="OneEuro min cutoff Hz (lower = smoother)")
+    r.add_argument("--beta", type=float, default=0.05, help="OneEuro speed coefficient (higher = less lag)")
+    for a in ("yaw", "pitch", "roll"):
+        r.add_argument(f"--invert-{a}", action="store_true")
+    s = sub.add_parser("soak", help="long test: rate, dropouts, drift, raw CSV")
+    s.add_argument("--minutes", type=float, default=10)
+    s.add_argument("--still-minutes", type=float, default=2)
+    s.add_argument("--out", default=os.path.join(ROOT, "tools", "soak-" + time.strftime("%Y%m%d-%H%M%S")))
+    args = ap.parse_args()
+    {"calibrate": cmd_calibrate, "run": cmd_run, "soak": cmd_soak}[args.cmd](args)
+
+
+if __name__ == "__main__":
+    main()

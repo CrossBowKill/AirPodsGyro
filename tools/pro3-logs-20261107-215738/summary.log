@@ -1,0 +1,346 @@
+Logs: /home/ubuntu/Downloads/AirPodsGyro-main/tools/pro3-logs-20261107-215738
+
+=================== 1/6 System and Bluetooth controller ===================
+Linux ubuntu 7.0.0-30-generic #30-Ubuntu SMP PREEMPT_DYNAMIC Fri Jul 31 18:22:54 UTC 2026 x86_64 GNU/Linux
+PRETTY_NAME="Ubuntu 26.04.1 LTS"
+VERSION="26.04.1 LTS (Resolute Raccoon)"
+Python 3.14.4
+Realtek BT USB 0bda:8922: present
+[    9.583254] Bluetooth: Core ver 2.22
+[    9.583271] NET: Registered PF_BLUETOOTH protocol family
+[    9.583272] Bluetooth: HCI device and connection manager initialized
+[    9.583278] Bluetooth: HCI socket layer initialized
+[    9.583279] Bluetooth: L2CAP socket layer initialized
+[    9.583281] Bluetooth: SCO socket layer initialized
+[    9.644467] usbcore: registered new interface driver btusb
+[    9.647208] Bluetooth: hci0: RTL: examining hci_ver=0c hci_rev=000a lmp_ver=0c lmp_subver=8922
+[    9.648206] Bluetooth: hci0: RTL: rom_version status=0 version=1
+[    9.649205] Bluetooth: hci0: RTL: btrtl_initialize: key id 0
+[    9.649206] Bluetooth: hci0: RTL: loading rtl_bt/rtl8922au_fw.bin
+[    9.653223] Bluetooth: hci0: RTL: loading rtl_bt/rtl8922au_config.bin
+[    9.655811] Bluetooth: hci0: RTL: cfg_sz 6, total sz 71307
+[   10.279204] Bluetooth: hci0: RTL: fw version 0x41c0c905
+[   10.372203] Bluetooth: hci0: AOSP extensions version v1.00
+[   12.453188] Bluetooth: hci0: Malformed MSFT vendor event: 0x00
+[   21.405881] Bluetooth: BNEP (Ethernet Emulation) ver 1.3
+[   21.405884] Bluetooth: BNEP filters: protocol multicast
+[   21.405887] Bluetooth: BNEP socket layer initialized
+[   21.406363] Bluetooth: MGMT ver 1.23
+[   21.694061] Bluetooth: hci0: Malformed MSFT vendor event: 0x00
+[   21.777062] Bluetooth: hci0: AOSP extensions version v1.00
+[   75.842041] Bluetooth: RFCOMM TTY layer initialized
+[   75.842049] Bluetooth: RFCOMM socket layer initialized
+[   75.842053] Bluetooth: RFCOMM ver 1.11
+firmware files: rtl8922au_config.bin.zst rtl8922au_fw.bin.zst 
+Controller 58:10:31:EC:3F:BB (public)
+	Manufacturer: 0x005d (93)
+	Version: 0x0c (12)
+	Name: ubuntu
+	Alias: ubuntu
+	Class: 0x007c0104 (8126724)
+	Powered: yes
+	PowerState: on
+	Discoverable: no
+	DiscoverableTimeout: 0x000000b4 (180)
+	Pairable: no
+	UUID: Message Notification Se.. (00001133-0000-1000-8000-00805f9b34fb)
+	UUID: A/V Remote Control        (0000110e-0000-1000-8000-00805f9b34fb)
+	UUID: Vendor specific           (03b80e5a-ede8-4b33-a751-6ce34ec4c700)
+	UUID: OBEX Object Push          (00001105-0000-1000-8000-00805f9b34fb)
+	UUID: Message Access Server     (00001132-0000-1000-8000-00805f9b34fb)
+	UUID: PnP Information           (00001200-0000-1000-8000-00805f9b34fb)
+	UUID: IrMC Sync                 (00001104-0000-1000-8000-00805f9b34fb)
+	UUID: Vendor specific           (00005005-0000-1000-8000-0002ee000001)
+	UUID: A/V Remote Control Target (0000110c-0000-1000-8000-00805f9b34fb)
+	UUID: Generic Attribute Profile (00001801-0000-1000-8000-00805f9b34fb)
+	UUID: Phonebook Access Server   (0000112f-0000-1000-8000-00805f9b34fb)
+	UUID: Audio Sink                (0000110b-0000-1000-8000-00805f9b34fb)
+	UUID: Device Information        (0000180a-0000-1000-8000-00805f9b34fb)
+	UUID: Generic Access Profile    (00001800-0000-1000-8000-00805f9b34fb)
+	UUID: Phonebook Access Client   (0000112e-0000-1000-8000-00805f9b34fb)
+	UUID: Handsfree Audio Gateway   (0000111f-0000-1000-8000-00805f9b34fb)
+	UUID: Audio Source              (0000110a-0000-1000-8000-00805f9b34fb)
+	UUID: OBEX File Transfer        (00001106-0000-1000-8000-00805f9b34fb)
+	UUID: Handsfree                 (0000111e-0000-1000-8000-00805f9b34fb)
+	Modalias: usb:v1D6Bp0246d0555
+	Discovering: no
+	Roles: central
+	Roles: peripheral
+Advertising Features:
+	ActiveInstances: 0x00 (0)
+	SupportedInstances: 0x0a (10)
+	SupportedIncludes: tx-power
+	SupportedIncludes: appearance
+	SupportedIncludes: local-name
+	SupportedSecondaryChannels: 1M
+	SupportedSecondaryChannels: 2M
+	SupportedSecondaryChannels: Coded
+	SupportedCapabilities.MinTxPower: 0xfffffff5 (-11)
+	SupportedCapabilities.MaxTxPower: 0x0010 (16)
+	SupportedCapabilities.MaxAdvLen: 0xfb (251)
+	SupportedCapabilities.MaxScnRspLen: 0xfb (251)
+	SupportedFeatures: CanSetTxPower
+	SupportedFeatures: HardwareOffload
+
+=================== 2/6 Find the AirPods Pro 3 ===================
+	Name: AirPods Pro - Find My
+	Paired: yes
+	Connected: yes
+	Modalias: bluetooth:v004Cp2027d215C
+>>> Put BOTH AirPods in your ears and sit still facing your monitor - press Enter when ready 
+=================== 3/6 Raw SensorDataWX at MTU 2582 and 672 (mousepods mtu_test.py) ===================
+--- MTU 2582 ---
+L2CAP options avant: (0, 672)
+L2CAP options après connect: (2582, 2582)
+[init] data=0
+[request_all_descriptors x2] data=0
+   WX len=521 08b72810012af503081012f003d30000000d0000810800000956656e646f72494440000004ac0500 [b'endor', b'ocation', b'ccessory']
+   WX len=889 08b82810012af503081012f003d30000000d0000810800000956656e646f72494440000004ac0500 [b'endor', b'ocation', b'ccessory']
+   WX len=685 08b92810012ab901081212b401d3000000050000810d0000094d61785265706f727453697a650100 [b'eport', b'endor', b'ccessory']
+   WX len=21 08ba28100162020810 []
+   WX len=441 08bb2810012aa503081412a003d3000000070000810d0000094d61785265706f727453697a650100 [b'eport', b'ocation', b'eart']
+   WX len=29 08bc2810016202080e6202081262020813 []
+   WX len=21 08bd28100162020814 []
+[start 14] data=0
+   WX len=21 08be2810014a02080e []
+   WX len=46 08bf2810013a1b080e1a170102df09d06b0000000029000301008827dd5a00000000 []
+   WX len=46 08c02810013a1b080e1a170102b311d36b000000002a000301008827dd5a00000000 []
+   WX len=46 08c12810013a1b080e1a1701029819d66b000000002b000301008827dd5a00000000 []
+   WX len=46 08c22810013a1b080e1a1701028621d96b000000002c000301008827dd5a00000000 []
+   WX len=46 08c32810013a1b080e1a1701026f29dc6b000000002d000301008827dd5a00000000 []
+   WX len=46 08c42810013a1b080e1a1701025831df6b000000002e000301008827dd5a00000000 []
+[start 16] data=74
+   WX len=21 08c52810014a020810 []
+   DATA len=81 04000400170000001000450008c62810013a3e08101a3a01e87d897e53020000030082426de06b00
+   DATA len=81 04000400170000001000450008c72810013a3e08101a3a01a8c4e98053020000030082fa08e16b00
+   WX len=46 08ca2810013a1b080e1a1701020398e26b000000002f000301008827dd5a00000000 []
+   WX len=46 08d02810013a1b080e1a1701029ea2e56b0000000030000301008827dd5a00000000 []
+   WX len=46 08d62810013a1b080e1a17010239ade86b0000000031000301008827dd5a00000000 []
+   WX len=46 08dc2810013a1b080e1a170102d3b7eb6b000000003200030100eedae96b00000000 []
+   WX len=46 08e22810013a1b080e1a1701026ec2ee6b000000003300030100eedae96b00000000 []
+   WX len=46 08e82810013a1b080e1a17010209cdf16b000000003400030100eedae96b00000000 []
+   WX len=46 08ee2810013a1b080e1a170102a3d7f46b000000003500030100eedae96b00000000 []
+   WX len=46 08f42810013a1b080e1a1701023ee2f76b000000003600030100eedae96b00000000 []
+   WX len=46 08fa2810013a1b080e1a170102d9ecfa6b000000003700030100eedae96b00000000 []
+--- MTU 672 ---
+L2CAP options avant: (0, 672)
+L2CAP options après connect: (2582, 672)
+[init] data=87
+   DATA len=81 04000400170000001000450008d42910013a3e08101a3a01a017eda95402000003004317122d6c00
+   DATA len=81 04000400170000001000450008d52910013a3e08101a3a01605e4dac54020000030043cfad2d6c00
+[request_all_descriptors x2] data=0
+   WX len=521 08ab2a10012af503081012f003d30000000d0000810800000956656e646f72494440000004ac0500 [b'endor', b'ocation', b'ccessory']
+   WX len=21 08ae2a100162020810 []
+   WX len=441 08af2a10012aa503081412a003d3000000070000810d0000094d61785265706f727453697a650100 [b'eport', b'ocation', b'eart']
+   WX len=21 08b02a100162020814 []
+[start 14] data=0
+   WX len=21 08b12a10014a02080e []
+[start 16] data=0
+   WX len=21 08b22a10014a020810 []
+[start 15] data=0
+   WX len=21 08b32a10014a02080e []
+   WX len=21 08b42a10014a02080f []
+[start 79] data=0
+   WX len=21 08b52a10014a02080f []
+[start 7] data=0
+   WX len=24 08b62a10014a05080710c705 []
+[start 9] data=0
+   WX len=24 08b72a10014a05080910c705 []
+[start 6] data=0
+   WX len=24 08b82a10014a05080610c705 []
+[start 11] data=0
+   WX len=21 08b92a10014a02080b []
+[start 12] data=0
+   WX len=21 08ba2a10014a02080c []
+
+=================== 4/6 Head-tracking stream (pods-head-tracker probe) ===================
+>>> Keep your head completely still for 10 s once it starts - press Enter when ready connecting to 34:0E:22:54:5B:C4 PSM 0x1001 ...
+L2CAP channel OPEN (attempt 1)
+
+=== burst=minimal variant=ALT ===
+sent handshake
+sent START (27B)
+  rx op=0x00 (18B): 010004000000010003000000000000000000
+  big non-HT packet (153B): 040004002b00018800d607606e0000000054b41f...
+  rx op=0x0c (14B): 040004000c00bb3fec3110580101
+  big non-HT packet (104B): 04000400020029010e0202040100000010024001...
+  big non-HT packet (244B): 040004001d0002eb000400416972506f64732050...
+  rx op=0x09 (11B): 0400040009000d01000000
+  rx op=0x09 (11B): 0400040009001800000000
+  rx op=0x09 (11B): 0400040009001700000000
+  rx op=0x09 (11B): 0400040009002501000000
+  rx op=0x09 (11B): 0400040009002300000000
+  rx op=0x09 (11B): 0400040009001f50500000
+  rx op=0x09 (11B): 0400040009002400030000
+  rx op=0x09 (11B): 0400040009002801000000
+  rx op=0x09 (11B): 0400040009002601000000
+  rx op=0x09 (11B): 0400040009002902000000
+  rx op=0x09 (11B): 0400040009002c02000000
+  rx op=0x09 (11B): 0400040009002f00000000
+  rx op=0x09 (11B): 0400040009003300000000
+  rx op=0x09 (11B): 0400040009002e32000000
+  rx op=0x09 (11B): 0400040009003001000000
+  rx op=0x09 (11B): 0400040009001b02000000
+  rx op=0x09 (11B): 0400040009003502000000
+  rx op=0x09 (11B): 0400040009003e02000000
+  rx op=0x09 (11B): 0400040009003700000000
+  rx op=0x09 (11B): 0400040009003800000000
+  rx op=0x09 (11B): 0400040009003b01000000
+  rx op=0x4e (14B): 040004004e000200000000000000
+  big non-HT packet (140B): 0400040053008400020000000000000000000000...
+  rx op=0x63 (13B): 04000400630005000101323232
+  rx op=0x17 (21B): 04000400170000001000090008bb2a10014a020810
+
+wrote 0 rows to /home/ubuntu/Downloads/AirPodsGyro-main/tools/pro3-logs-20261107-215738/ht-still.csv
+
+RESULT: 0 head-tracking sensor packets received.
+>>> NO sensor stream (same wall as the Pico). Capture-and-diff needed.
+>>> Turn your head slowly LEFT and RIGHT (like saying no) for 10 s once it starts - press Enter when ready connecting to 34:0E:22:54:5B:C4 PSM 0x1001 ...
+L2CAP channel OPEN (attempt 1)
+
+=== burst=minimal variant=ALT ===
+sent handshake
+sent START (27B)
+  rx op=0x00 (18B): 010004000000010003000000000000000000
+  big non-HT packet (153B): 040004002b00018800dad2c66f0000000054b41f...
+  rx op=0x0c (14B): 040004000c00bb3fec3110580101
+  big non-HT packet (104B): 04000400020029010e0202040100000010024001...
+  big non-HT packet (244B): 040004001d0002eb000400416972506f64732050...
+  rx op=0x09 (11B): 0400040009000d01000000
+  rx op=0x09 (11B): 0400040009001800000000
+  rx op=0x09 (11B): 0400040009001700000000
+  rx op=0x09 (11B): 0400040009002501000000
+  rx op=0x09 (11B): 0400040009002300000000
+  rx op=0x09 (11B): 0400040009001f50500000
+  rx op=0x09 (11B): 0400040009002400030000
+  rx op=0x09 (11B): 0400040009002801000000
+  rx op=0x09 (11B): 0400040009002601000000
+  rx op=0x09 (11B): 0400040009002902000000
+  rx op=0x63 (13B): 04000400630005000101323232
+  rx op=0x4e (14B): 040004004e000200000000000000
+  rx op=0x09 (11B): 0400040009002c02000000
+  rx op=0x09 (11B): 0400040009002f00000000
+  rx op=0x09 (11B): 0400040009003300000000
+  rx op=0x09 (11B): 0400040009002e32000000
+  rx op=0x09 (11B): 0400040009003001000000
+  rx op=0x09 (11B): 0400040009001b02000000
+  rx op=0x09 (11B): 0400040009003502000000
+  rx op=0x09 (11B): 0400040009003e02000000
+  rx op=0x09 (11B): 0400040009003700000000
+  rx op=0x09 (11B): 0400040009003800000000
+  rx op=0x09 (11B): 0400040009003b01000000
+  big non-HT packet (140B): 0400040053008400020000000000000000000000...
+  rx op=0x17 (21B): 04000400170000001000090008bc2a10014a020810
+
+wrote 0 rows to /home/ubuntu/Downloads/AirPodsGyro-main/tools/pro3-logs-20261107-215738/ht-yaw.csv
+
+RESULT: 0 head-tracking sensor packets received.
+>>> NO sensor stream (same wall as the Pico). Capture-and-diff needed.
+>>> Nod slowly UP and DOWN (like saying yes) for 10 s once it starts - press Enter when ready connecting to 34:0E:22:54:5B:C4 PSM 0x1001 ...
+L2CAP channel OPEN (attempt 1)
+
+=== burst=minimal variant=ALT ===
+sent handshake
+sent START (27B)
+  rx op=0x00 (18B): 010004000000010003000000000000000000
+  big non-HT packet (153B): 040004002b00018800af361d710000000054b41f...
+  rx op=0x0c (14B): 040004000c00bb3fec3110580101
+  big non-HT packet (104B): 04000400020029010e0202040100000010024001...
+  big non-HT packet (244B): 040004001d0002eb000400416972506f64732050...
+  rx op=0x09 (11B): 0400040009000d01000000
+  rx op=0x09 (11B): 0400040009001800000000
+  rx op=0x09 (11B): 0400040009001700000000
+  rx op=0x09 (11B): 0400040009002501000000
+  rx op=0x09 (11B): 0400040009002300000000
+  rx op=0x09 (11B): 0400040009001f50500000
+  rx op=0x09 (11B): 0400040009002400030000
+  rx op=0x09 (11B): 0400040009002801000000
+  rx op=0x09 (11B): 0400040009002601000000
+  rx op=0x09 (11B): 0400040009002902000000
+  rx op=0x63 (13B): 04000400630005000101323232
+  rx op=0x4e (14B): 040004004e000200000000000000
+  rx op=0x09 (11B): 0400040009002c02000000
+  rx op=0x09 (11B): 0400040009002f00000000
+  rx op=0x09 (11B): 0400040009003300000000
+  rx op=0x09 (11B): 0400040009002e32000000
+  rx op=0x09 (11B): 0400040009003001000000
+  rx op=0x09 (11B): 0400040009001b02000000
+  rx op=0x09 (11B): 0400040009003502000000
+  rx op=0x09 (11B): 0400040009003e02000000
+  rx op=0x09 (11B): 0400040009003700000000
+  rx op=0x09 (11B): 0400040009003800000000
+  rx op=0x09 (11B): 0400040009003b01000000
+  big non-HT packet (140B): 0400040053008400020000000000000000000000...
+  rx op=0x17 (21B): 04000400170000001000090008bd2a10014a020810
+
+wrote 0 rows to /home/ubuntu/Downloads/AirPodsGyro-main/tools/pro3-logs-20261107-215738/ht-pitch.csv
+
+RESULT: 0 head-tracking sensor packets received.
+>>> NO sensor stream (same wall as the Pico). Capture-and-diff needed.
+>>> Tilt your head ear-to-shoulder LEFT and RIGHT for 10 s once it starts - press Enter when ready connecting to 34:0E:22:54:5B:C4 PSM 0x1001 ...
+L2CAP channel OPEN (attempt 1)
+
+=== burst=minimal variant=ALT ===
+sent handshake
+sent START (27B)
+  rx op=0x00 (18B): 010004000000010003000000000000000000
+  big non-HT packet (153B): 040004002b00018800e0709d720000000054b41f...
+  rx op=0x0c (14B): 040004000c00bb3fec3110580101
+  big non-HT packet (104B): 04000400020029010e0202040100000010024001...
+  big non-HT packet (244B): 040004001d0002eb000400416972506f64732050...
+  rx op=0x09 (11B): 0400040009000d01000000
+  rx op=0x09 (11B): 0400040009001800000000
+  rx op=0x09 (11B): 0400040009001700000000
+  rx op=0x09 (11B): 0400040009002501000000
+  rx op=0x09 (11B): 0400040009002300000000
+  rx op=0x09 (11B): 0400040009001f50500000
+  rx op=0x09 (11B): 0400040009002400030000
+  rx op=0x09 (11B): 0400040009002801000000
+  rx op=0x09 (11B): 0400040009002601000000
+  rx op=0x09 (11B): 0400040009002902000000
+  rx op=0x63 (13B): 04000400630005000101323232
+  rx op=0x4e (14B): 040004004e000200000000000000
+  rx op=0x09 (11B): 0400040009002c02000000
+  rx op=0x09 (11B): 0400040009002f00000000
+  rx op=0x09 (11B): 0400040009003300000000
+  rx op=0x09 (11B): 0400040009002e32000000
+  rx op=0x09 (11B): 0400040009003001000000
+  rx op=0x09 (11B): 0400040009001b02000000
+  rx op=0x09 (11B): 0400040009003502000000
+  rx op=0x09 (11B): 0400040009003e02000000
+  rx op=0x09 (11B): 0400040009003700000000
+  rx op=0x09 (11B): 0400040009003800000000
+  rx op=0x09 (11B): 0400040009003b01000000
+  big non-HT packet (140B): 0400040053008400020000000000000000000000...
+  rx op=0x17 (21B): 04000400170000001000090008be2a10014a020810
+
+wrote 0 rows to /home/ubuntu/Downloads/AirPodsGyro-main/tools/pro3-logs-20261107-215738/ht-roll.csv
+
+RESULT: 0 head-tracking sensor packets received.
+>>> NO sensor stream (same wall as the Pico). Capture-and-diff needed.
+--- extra: DEF start variant, full burst ---
+
+RESULT: 0 head-tracking sensor packets received.
+>>> NO sensor stream (same wall as the Pico). Capture-and-diff needed.
+
+=================== 5/6 mousepods raw gyro path (--diag, 20 s) ===================
+installing python3-evdev (needs internet)
+NOTE: mousepods may move the mouse cursor while it runs - that is fine.
+>>> Move your head around gently during the next 20 s - press Enter when ready 22:00:12 INFO Démarrage — mode DIAGNOSTIC, source auto
+22:00:13 INFO Canal AAP ouvert avec 34:0E:22:54:5B:C4 (modèle 2027)
+22:00:13 WARNING Profil 2027_head non calibré : lance --calibrate dans cette position
+22:00:17 INFO Pas de données de mouvement — relance du flux
+22:00:21 INFO Pas de données de mouvement — relance du flux
+22:00:25 INFO Pas de données de mouvement — relance du flux
+22:00:29 INFO Pas de données de mouvement — relance du flux
+
+=================== 6/6 Verdict ===================
+probe still: 0 packets in 10 s (~0 Hz)
+probe yaw: 0 packets in 10 s (~0 Hz)
+probe pitch: 0 packets in 10 s (~0 Hz)
+probe roll: 0 packets in 10 s (~0 Hz)
+raw SensorDataWX data packets: MTU2582=74  MTU672=87
+VERDICT: SUCCESS: AirPods Pro 3 stream head-tracking data over BlueZ (probe packets=0, raw@2582=74, raw@672=87). The protocol works; the Windows driver route is worth building.
+
+All logs packed into: /home/ubuntu/Downloads/AirPodsGyro-main/tools/pro3-logs-20261107-215738.tar.gz
+Copy that file to your USB stick and bring it back to Windows.

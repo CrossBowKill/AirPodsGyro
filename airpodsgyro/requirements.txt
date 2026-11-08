@@ -1,0 +1,2 @@
+# AirPodsGyro app (Windows GUI). Core and tests need only the standard library.
+PySide6==6.11.3

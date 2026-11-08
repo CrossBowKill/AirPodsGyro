@@ -1,0 +1,2 @@
+rtl8922au_config.bin.zst
+rtl8922au_fw.bin.zst

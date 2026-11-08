@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Large raw Ubuntu captures (keep locally, not in git)
+tools/**/hci.btsnoop
+tools/*.tar.gz
+
+# Copy of the project from the Ubuntu live USB (merged into root)
+AirPodsGyro-main (copy)/
+AirPodsGyro-main (Copy)/
+
+# Build output (airpodsgyro/packaging/build.py)
+build/
+dist/

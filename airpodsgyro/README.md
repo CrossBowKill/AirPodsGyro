@@ -1,0 +1,98 @@
+# airpodsgyro: AirPods Pro 3 head tracker for sims
+
+Turns AirPods Pro 3 (A3063, PID 0x2027) into a head tracker. Sends yaw, pitch and roll to OpenTrack's
+**FreePIE UDP receiver** (default port 4242) at about 100 Hz.
+
+## Layout
+
+| Path | What |
+| --- | --- |
+| `core/protocol.py` | AAP packets: open, start/stop SensorDataWX, block parsing (+ encoder for replay) |
+| `core/transport/` | `bluez.py` (Linux socket), `replay.py` (recorded soak.csv, no hardware), Windows driver later |
+| `core/session.py` | keeps the stream alive: stall restart, reconnect with backoff, clean stop |
+| `core/headtrack.py` | calibration + head angles from the on-board quaternion |
+| `core/filters.py` | OneEuro smoothing |
+| `core/drift.py` | yaw-drift compensation (heading lock while still, capped at 6 deg/min, learned rate) |
+| `core/pipeline.py` | worker thread: session, drift, head angles, axis response, smoothing, outputs |
+| `outputs/freetrack.py` | built-in game output: FreeTrack shared memory + TrackIR (opentrack's NPClient DLLs) |
+| `outputs/udp.py` | OpenTrack FreePIE UDP |
+| `gui/` + `app.py` | Windows desktop app (PySide6): status, head view, calibration wizard, settings, tray, hotkeys |
+| `bridge.py` | command-line front end over the same core (Linux testing, soak runs) |
+| `vendor/opentrack/` | opentrack's NPClient(64).dll, freetrackclient(64).dll, TrackIR.exe, games list + licence |
+
+## Desktop app (Windows)
+
+```powershell
+python -m venv .venv; .venv\Scripts\pip install -r airpodsgyro\requirements.txt
+.venv\Scripts\python airpodsgyro\app.py
+```
+
+- **Games & output**: built-in TrackIR/FreeTrack output; games find it through the registry like OpenTrack.
+  OpenTrack UDP is optional.
+- **Calibrate…** once (three held poses), then **Recenter** (default hotkey Ctrl+Alt+R, works in-game).
+  Ctrl+Alt+P pauses the output.
+- **Source**: *AirPods (Windows Bluetooth driver)* needs the driver from `driver/` (test-signing mode on,
+  then `driver\install.ps1` as admin). Verified 2026-11-08: 100 Hz while audio keeps playing.
+  *Recording* replays a `soak.csv` from `tools/` without hardware.
+- Settings and calibration live in `%APPDATA%\AirPodsGyro`.
+
+### Build the .exe
+
+```powershell
+.venv\Scripts\pip install -r airpodsgyro\packaging\requirements-build.txt
+.venv\Scripts\python airpodsgyro\packaging\build.py
+```
+
+This produces `dist\AirPodsGyro\AirPodsGyro.exe` (one folder, about 70 MB) and `dist\AirPodsGyro-<version>-win64.zip`
+(about 30 MB), with third-party licences in `licenses\`. The build removes Qt parts the app does not use, then
+runs `AirPodsGyro.exe --selftest` and fails if any check fails. The self-test covers bundled files, the games list,
+opentrack's NPClient64.dll reading the shared memory, and Qt plus the real main window streaming a generated
+recording. The version is set in `version.py`.
+
+## How it works
+
+- Opens the Bluetooth link and SensorDataWX stream (service 16, L2CAP PSM 0x1001, MTU 2582) through a
+  transport, using the AAP protocol code adapted from `../mousepods-main`.
+- Reads the attitude quaternion the AirPods compute on board (bytes 20–25 of each 58‑byte
+  sensor block, Q15 vector part). Live data confirmed it maps body → world: the quaternion's rotation
+  axis matches the gyro axis, median cos 1.00.
+- Head angles = rotation since the last recenter, expressed in a head frame
+  (right/forward/up) learned once by calibration from three held poses. See `headtrack.py`.
+- Smooths each axis with a OneEuro filter and sends FreePIE UDP frames (`outputs/udp.py`).
+- Always stops the stream on exit (service 16 → 0). If the stream is left running, the buds can stay
+  stuck and the next client gets no data.
+
+## Use
+
+```bash
+sudo python3 airpodsgyro/bridge.py calibrate                  # once per fit; recalibrate if the primary bud changes
+sudo python3 airpodsgyro/bridge.py run                        # Enter (or SIGUSR1) = recenter
+sudo python3 airpodsgyro/bridge.py run --host 192.168.1.20    # OpenTrack on another PC
+sudo python3 airpodsgyro/bridge.py soak --minutes 10          # rate / dropouts / drift / raw CSV
+bash tools/pro3-capture-soak.sh 10                            # btmon HCI capture + soak, packed .tar.gz
+```
+
+Sign conventions: yaw + = turn left, pitch + = look up, roll + = right ear down. Flip any axis with
+`--invert-yaw/--invert-pitch/--invert-roll` or in OpenTrack's options.
+
+No AirPods at hand (e.g. on Windows before the driver exists)? Replay a recording through the same code:
+
+```bash
+python airpodsgyro/bridge.py --replay tools/soak-20261107-225643/soak.csv --speed 0 soak --still-minutes 7.1
+python airpodsgyro/bridge.py --replay tools/capture-20261107-224116/soak.csv run   # live UDP to OpenTrack
+```
+
+Tests: `cd airpodsgyro && python -m unittest discover -s tests`. No Bluetooth needed. They include a byte-for-byte
+comparison with mousepods, a full replay of a real Pro 3 recording, drift checks on both recordings, and
+opentrack's NPClient64.dll reading our pose (Windows). GUI smoke test (needs PySide6):
+`.venv\Scripts\python airpodsgyro\tests\gui_smoke.py`.
+
+## Attribution
+
+- mousepods by starman-tech: Apache-2.0 code, CC BY 4.0 docs. See `../mousepods-main/LICENSE` and `NOTICE`.
+  `core/protocol.py`, `core/transport/bluez.py` and `core/filters.py` are adapted from it (header notes the changes).
+- opentrack (ISC): the bundled DLLs, TrackIR.exe helper and games list in `vendor/opentrack/`
+  (licence: `vendor/opentrack/OPENTRACK-LICENSING.txt`). `outputs/freetrack.py` follows its
+  `proto-ft` behaviour.
+- pods-head-tracker by batubozkan (GPL-3.0) is no longer imported. The FreePIE UDP sender was rewritten from the
+  format description, so this app can stay Apache-2.0.

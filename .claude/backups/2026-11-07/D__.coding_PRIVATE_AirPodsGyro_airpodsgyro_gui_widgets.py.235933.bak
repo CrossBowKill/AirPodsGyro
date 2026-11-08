@@ -1,0 +1,131 @@
+"""Custom widgets: live head view, status badge, app icon. Drawn with QPainter, no image assets."""
+
+import math
+
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
+
+ACCENT = QColor(0, 122, 204)
+OK, WARN, BAD, IDLE = QColor(46, 160, 67), QColor(214, 158, 0), QColor(207, 34, 46), QColor(130, 130, 130)
+
+
+def app_icon(state_color=ACCENT):
+    """Round icon: a head outline with an orientation tick, tinted by state (tray uses it)."""
+    icon = QIcon()
+    for size in (16, 24, 32, 48, 64, 128, 256):
+        pm = QPixmap(size, size)
+        pm.fill(Qt.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.Antialiasing)
+        m = size * 0.08
+        p.setPen(Qt.NoPen)
+        p.setBrush(state_color)
+        p.drawEllipse(QRectF(m, m, size - 2 * m, size - 2 * m))
+        p.setBrush(QColor(255, 255, 255))
+        c = size / 2
+        r = size * 0.22
+        p.drawEllipse(QPointF(c, c + size * 0.04), r, r * 1.15)
+        p.setPen(QPen(QColor(255, 255, 255), max(1.5, size * 0.07), cap=Qt.RoundCap))
+        p.drawLine(QPointF(c, c - r * 1.1), QPointF(c, m + size * 0.07))
+        p.end()
+        icon.addPixmap(pm)
+    return icon
+
+
+class Badge(QLabel):
+    """Small rounded status label."""
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setAlignment(Qt.AlignCenter)
+        self.setMinimumWidth(110)
+        self.set_state(text, IDLE)
+
+    def set_state(self, text, color):
+        self.setText(text)
+        self.setStyleSheet(
+            f"QLabel {{ background: {color.name()}; color: white; border-radius: 10px;"
+            f" padding: 3px 10px; font-weight: 600; }}")
+
+
+class HeadView(QWidget):
+    """Three dials: yaw (from above), pitch (from the side), roll (from the front)."""
+
+    LABELS = (("Yaw", "from above"), ("Pitch", "from the side"), ("Roll", "from the front"))
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.angles = None
+        self.active = False
+        self.setMinimumHeight(190)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def set_angles(self, angles, active=True):
+        self.angles, self.active = angles, active
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        pal = self.palette()
+        fg, mid = pal.windowText().color(), pal.mid().color()
+        w = self.width() / 3
+        h = self.height()
+        r = max(20.0, min(w * 0.36, (h - 50) / 2))
+        yaw, pitch, roll = self.angles or (0.0, 0.0, 0.0)
+        # screen rotations: yaw + = left = counter-clockwise from above; pitch + = up; roll + = right ear down
+        rot = (-yaw, -pitch, roll)
+        for i, ((name, sub), a, val) in enumerate(zip(self.LABELS, rot, (yaw, pitch, roll))):
+            c = QPointF(w * i + w / 2, 18 + r)
+            p.setPen(QPen(mid, 1.5))
+            p.setBrush(Qt.NoBrush)
+            p.drawEllipse(c, r, r)
+            for t in range(0, 360, 30):                    # ticks every 30 degrees
+                ang = math.radians(t)
+                p.drawLine(QPointF(c.x() + math.sin(ang) * r * 0.9, c.y() - math.cos(ang) * r * 0.9),
+                           QPointF(c.x() + math.sin(ang) * r, c.y() - math.cos(ang) * r))
+            color = ACCENT if (self.active and self.angles) else IDLE
+            p.save()
+            p.translate(c)
+            p.rotate(a)
+            self._glyph(p, i, r, color)
+            p.restore()
+            p.setPen(fg)
+            f = QFont(self.font())
+            f.setBold(True)
+            p.setFont(f)
+            text = f"{name}  {val:+6.1f}°" if self.angles else f"{name}  —"
+            p.drawText(QRectF(w * i, 22 + 2 * r, w, 20), Qt.AlignCenter, text)
+            f.setBold(False)
+            f.setPointSizeF(max(7.0, f.pointSizeF() - 1.5))
+            p.setFont(f)
+            p.setPen(mid)
+            p.drawText(QRectF(w * i, 40 + 2 * r, w, 16), Qt.AlignCenter, sub)
+        p.end()
+
+    @staticmethod
+    def _glyph(p, kind, r, color):
+        p.setPen(QPen(color, 2.5))
+        p.setBrush(QColor(color.red(), color.green(), color.blue(), 40))
+        if kind == 0:                                     # head from above, nose up
+            p.drawEllipse(QPointF(0, 0), r * 0.42, r * 0.5)
+            path = QPainterPath(QPointF(-r * 0.12, -r * 0.47))
+            path.lineTo(0, -r * 0.68)
+            path.lineTo(r * 0.12, -r * 0.47)
+            p.drawPath(path)
+            p.drawEllipse(QPointF(-r * 0.45, 0), r * 0.07, r * 0.13)
+            p.drawEllipse(QPointF(r * 0.45, 0), r * 0.07, r * 0.13)
+        elif kind == 1:                                   # head from the side, facing right
+            p.drawEllipse(QPointF(0, 0), r * 0.45, r * 0.5)
+            path = QPainterPath(QPointF(r * 0.43, -r * 0.08))
+            path.lineTo(r * 0.62, r * 0.05)
+            path.lineTo(r * 0.43, r * 0.12)
+            p.drawPath(path)
+            p.drawLine(QPointF(r * 0.45, 0), QPointF(r * 0.95, 0))
+        else:                                             # head from the front
+            p.drawEllipse(QPointF(0, 0), r * 0.42, r * 0.52)
+            p.drawEllipse(QPointF(-r * 0.47, 0), r * 0.07, r * 0.14)
+            p.drawEllipse(QPointF(r * 0.47, 0), r * 0.07, r * 0.14)
+            p.drawLine(QPointF(-r * 0.95, 0), QPointF(-r * 0.6, 0))
+            p.drawLine(QPointF(r * 0.6, 0), QPointF(r * 0.95, 0))

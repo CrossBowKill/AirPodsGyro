@@ -1,0 +1,37 @@
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 001 Device 002: ID 0bda:5409 Realtek Semiconductor Corp. USB2.1 Hub
+Bus 001 Device 003: ID 045e:02fe Microsoft Corp. Xbox Wireless Adapter for Windows
+Bus 001 Device 004: ID 187c:101a Alienware Corporation HID Device
+Bus 001 Device 005: ID 048d:5711 Integrated Technology Express, Inc. GIGABYTE Device 
+Bus 001 Device 006: ID 0bda:8922 Realtek Semiconductor Corp. Bluetooth Radio
+Bus 001 Device 007: ID 3142:0c33 MV-SILICON fifine SC3
+Bus 001 Device 008: ID 2022:0522 Љ Љ
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 002 Device 002: ID 0781:55a9 SanDisk Corp.  SanDisk 3.2Gen1
+Bus 002 Device 003: ID 0bda:0409 Realtek Semiconductor Corp. USB3.2 Hub
+Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 003 Device 002: ID 1a40:0801 Terminus Technology Inc. USB 2.0 Hub
+Bus 003 Device 003: ID 1b1c:1d0d Corsair XENEON EDGE
+Bus 003 Device 005: ID 27c0:0859 Cadwell Laboratories, Inc. TouchScreen
+Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 006 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 007 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 007 Device 002: ID 0bda:5411 Realtek Semiconductor Corp. RTS5411 Hub
+Bus 007 Device 003: ID 05e3:0610 Genesys Logic, Inc. Hub
+Bus 007 Device 004: ID 05e3:0610 Genesys Logic, Inc. Hub
+Bus 007 Device 005: ID 046d:c52b Logitech, Inc. Unifying Receiver
+Bus 007 Device 006: ID 1b1c:2b19 Corsair CORSAIR K100 MAX RGB MX KB
+Bus 007 Device 007: ID 0eb7:1a92 Endor AG ClubSport USB Shifter
+Bus 007 Device 008: ID 046d:0b1c Logitech, Inc. A50
+Bus 007 Device 009: ID 04d8:ee96 Microchip Technology, Inc. ForceFeel Pad
+Bus 007 Device 010: ID 1b1c:2b0c Corsair CORSAIR GALLEON 100 SD Mechanical Gaming Keyboard
+Bus 007 Device 011: ID 1b1c:2b18 Corsair CORSAIR GALLEON 100 SD
+Bus 008 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 008 Device 002: ID 0bda:0411 Realtek Semiconductor Corp. Hub
+Bus 008 Device 003: ID 05e3:0626 Genesys Logic, Inc. Hub
+Bus 008 Device 004: ID 05e3:0626 Genesys Logic, Inc. Hub
+Bus 009 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 009 Device 002: ID 05e3:0608 Genesys Logic, Inc. Hub
+Bus 009 Device 003: ID 8888:9778 Unknown SimHub Controller Remapper Bridge
+Bus 009 Device 004: ID 3151:5007        AM INFINITY 8K MOUSE

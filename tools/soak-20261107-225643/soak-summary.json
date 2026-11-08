@@ -1,0 +1,25 @@
+{
+  "minutes_planned": 8.0,
+  "interval_us": 10000,
+  "samples": 42457,
+  "gaps": {
+    ">50ms": 9
+  },
+  "max_gap_ms": 56,
+  "stream_restarts": 0,
+  "reconnects": 0,
+  "invalid_quat": 12,
+  "calibrated": true,
+  "still_phase": {
+    "minutes": 7.05,
+    "total_rotation_end_deg": 7.67,
+    "drift_deg_per_min": 1.09,
+    "yaw_end_deg": 7.35
+  },
+  "quat_convention_check": {
+    "moving_windows": 535,
+    "body_frame_cos_median": 1.0,
+    "world_frame_cos_median": -0.267,
+    "expect": "body_frame close to 1.0"
+  }
+}

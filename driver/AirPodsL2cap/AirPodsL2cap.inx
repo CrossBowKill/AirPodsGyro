@@ -1,0 +1,66 @@
+;
+; AirPodsL2cap.inf: AirPods head-tracking channel for AirPodsGyro.
+;
+; Binds to the device node Windows creates for Apple's service {74ec2172-0bad-4d01-8f77-997b2be0722a}
+; on paired AirPods. That node has no inbox driver; audio (A2DP / hands-free) uses other nodes.
+;
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = Bluetooth
+ClassGuid   = {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+Provider    = %ProviderString%
+DriverVer   =
+CatalogFile = AirPodsL2cap.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskId1%,,,""
+
+[SourceDisksFiles]
+AirPodsL2cap.sys = 1,,
+
+[Manufacturer]
+%ManufacturerString% = AirPodsGyro,NT$ARCH$.10.0.1..16299
+
+[AirPodsGyro.NT$ARCH$.10.0.1..16299]
+%DeviceDesc% = AirPodsL2cap_Inst, BTHENUM\{74ec2172-0bad-4d01-8f77-997b2be0722a}
+
+[AirPodsL2cap_Inst.NT]
+CopyFiles = DriverStore_Dir
+
+[DriverStore_Dir]
+AirPodsL2cap.sys
+
+[AirPodsL2cap_Inst.NT.HW]
+AddReg = AirPodsL2cap_HW_AddReg
+
+[AirPodsL2cap_HW_AddReg]
+; SYSTEM and Administrators: all; interactive users: read/write (the app runs unelevated)
+HKR,,Security,,"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"
+
+[AirPodsL2cap_Inst.NT.Services]
+AddService = AirPodsL2cap, 0x00000002, AirPodsL2cap_Service_Inst
+
+[AirPodsL2cap_Service_Inst]
+DisplayName   = %SvcDesc%
+ServiceType   = 1               ; SERVICE_KERNEL_DRIVER
+StartType     = 3               ; SERVICE_DEMAND_START
+ErrorControl  = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary = %13%\AirPodsL2cap.sys
+
+[AirPodsL2cap_Inst.NT.Wdf]
+KmdfService = AirPodsL2cap, AirPodsL2cap_wdfsect
+
+[AirPodsL2cap_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+ProviderString     = "AirPodsGyro"
+ManufacturerString = "AirPodsGyro"
+DiskId1            = "AirPodsGyro driver"
+DeviceDesc         = "AirPods head tracking (AirPodsGyro)"
+SvcDesc            = "AirPodsGyro L2CAP channel"

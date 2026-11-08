@@ -8,5 +8,35 @@
     "sample_error": "Exit code 2",
     "first_seen": "2026-11-07 02:18:29",
     "flagged": false
+  },
+  "bash_exit_code_128_": {
+    "count": 1,
+    "last_seen": "2026-11-07 23:36:24",
+    "category": "OTHER",
+    "severity": "CRITICAL",
+    "tool": "Bash",
+    "sample_error": "Exit code 128",
+    "first_seen": "2026-11-07 23:36:24",
+    "flagged": false
+  },
+  "bash_exit_code_1_": {
+    "count": 1,
+    "last_seen": "2026-11-07 23:39:12",
+    "category": "OTHER",
+    "severity": "ERROR",
+    "tool": "Bash",
+    "sample_error": "Exit code 1",
+    "first_seen": "2026-11-07 23:39:12",
+    "flagged": false
+  },
+  "bash_exit_code_4_": {
+    "count": 1,
+    "last_seen": "2026-11-07 23:52:08",
+    "category": "OTHER",
+    "severity": "ERROR",
+    "tool": "Bash",
+    "sample_error": "Exit code 4",
+    "first_seen": "2026-11-07 23:52:08",
+    "flagged": false
   }
 }

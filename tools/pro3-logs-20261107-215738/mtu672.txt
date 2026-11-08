@@ -1,0 +1,29 @@
+L2CAP options avant: (0, 672)
+L2CAP options après connect: (2582, 672)
+[init] data=87
+   DATA len=81 04000400170000001000450008d42910013a3e08101a3a01a017eda95402000003004317122d6c00
+   DATA len=81 04000400170000001000450008d52910013a3e08101a3a01605e4dac54020000030043cfad2d6c00
+[request_all_descriptors x2] data=0
+   WX len=521 08ab2a10012af503081012f003d30000000d0000810800000956656e646f72494440000004ac0500 [b'endor', b'ocation', b'ccessory']
+   WX len=21 08ae2a100162020810 []
+   WX len=441 08af2a10012aa503081412a003d3000000070000810d0000094d61785265706f727453697a650100 [b'eport', b'ocation', b'eart']
+   WX len=21 08b02a100162020814 []
+[start 14] data=0
+   WX len=21 08b12a10014a02080e []
+[start 16] data=0
+   WX len=21 08b22a10014a020810 []
+[start 15] data=0
+   WX len=21 08b32a10014a02080e []
+   WX len=21 08b42a10014a02080f []
+[start 79] data=0
+   WX len=21 08b52a10014a02080f []
+[start 7] data=0
+   WX len=24 08b62a10014a05080710c705 []
+[start 9] data=0
+   WX len=24 08b72a10014a05080910c705 []
+[start 6] data=0
+   WX len=24 08b82a10014a05080610c705 []
+[start 11] data=0
+   WX len=21 08b92a10014a02080b []
+[start 12] data=0
+   WX len=21 08ba2a10014a02080c []

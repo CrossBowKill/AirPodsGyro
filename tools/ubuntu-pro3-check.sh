@@ -118,6 +118,13 @@ if ! python3 -c 'import evdev' 2>/dev/null; then
     echo "installing python3-evdev (needs internet)"; sudo apt-get install -y python3-evdev > "$OUT/apt.txt" 2>&1
 fi
 echo "NOTE: mousepods may move the mouse cursor while it runs - that is fine."
+# The probe (step 4) uses the AirPods Pro 2 start packets; afterwards the Pro 3 can stay in a state
+# where the next client gets no sensor data. A clean connect + stop (svc 16 -> 0) clears it.
+echo "resetting the sensor stream after the probe..."
+sudo python3 -c "import sys; sys.path.insert(0, '$MP'); import airpods_mouse_controller as m, time
+a = m.AAPClient('$MAC', True); a.connect(); a.stream(0x10, 0); a.stream(0x0E, 0); time.sleep(0.5); a.close()" \
+    > "$OUT/reset.txt" 2>&1 || echo "(reset failed, see reset.txt)"
+sleep 2
 pause "Move your head around gently during the next 20 s"
 sudo timeout 20 python3 "$MP/airpods_mouse_controller.py" --diag --no-web -v \
     -c "$OUT/mousepods-config.json" > "$OUT/mousepods-diag.txt" 2>&1
@@ -136,8 +143,15 @@ done
 d2582=$(grep -o 'data=[0-9]*' "$OUT/mtu2582.txt" | cut -d= -f2 | sort -n | tail -1); d2582=${d2582:-0}
 d672=$(grep -o 'data=[0-9]*' "$OUT/mtu672.txt" | cut -d= -f2 | sort -n | tail -1); d672=${d672:-0}
 echo "raw SensorDataWX data packets: MTU2582=$d2582  MTU672=$d672"
-if [ "$total" -gt 0 ] || [ "$d2582" -gt 0 ]; then
-    verdict "SUCCESS: AirPods Pro 3 stream head-tracking data over BlueZ (probe packets=$total, raw@2582=$d2582, raw@672=$d672). The protocol works; the Windows driver route is worth building."
+# mousepods prints a live line ending in 'éch. N' (N = decoded sensor samples) separated by \r
+mp_n=$(tr '\r' '\n' < "$OUT/mousepods-diag.txt" | grep -o 'éch\. [0-9]*' | awk '{print $2}' | sort -n | tail -1)
+mp_n=${mp_n:-0}
+echo "mousepods decoded gyro samples in 20 s: $mp_n (~$(( mp_n / 20 )) Hz)"
+echo "(probe = Pro 2 head-tracking format; 0 packets is EXPECTED on Pro 3 and not a failure)"
+if [ "$mp_n" -gt 100 ]; then
+    verdict "SUCCESS: mousepods decoded $mp_n gyro samples (~$(( mp_n / 20 )) Hz) from the Pro 3 over BlueZ (raw@2582=$d2582, raw@672=$d672, Pro2-probe=$total). The full sensor path works; the Windows driver route is worth building."
+elif [ "$d2582" -gt 0 ] || [ "$d672" -gt 0 ]; then
+    verdict "PARTIAL: raw SensorDataWX packets arrive (raw@2582=$d2582, raw@672=$d672) but mousepods decoded only $mp_n samples. Run: sudo python3 airpodsgyro/bridge.py soak --minutes 1"
 else
     verdict "NO STREAM: channel/data did not come up. Logs needed for analysis before any Windows work."
 fi

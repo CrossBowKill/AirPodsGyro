@@ -1,0 +1,116 @@
+"""Yaw-drift compensation: removes slow heading drift while still, leaves real head turns alone."""
+
+import os
+import sys
+import unittest
+
+HERE = os.path.dirname(__file__)
+ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+sys.path.insert(0, os.path.join(HERE, ".."))
+from core import headtrack as ht  # noqa: E402
+from core import protocol as p  # noqa: E402
+from core.drift import DriftCompensator, axis_quat, qmul, twist_deg  # noqa: E402
+from core.transport.replay import read_soak_csv  # noqa: E402
+
+UP = (0.0, 0.0, 1.0)
+MOUNT = ht.vnorm((0.3, -0.5, 0.8))
+
+
+def synth(segments, hz=100):
+    """segments: [(seconds, heading_rate_dps, is_real_motion)]. Returns quantised samples + true heading.
+
+    Drift segments turn the AirPods' world heading without any gyro signal (that is what the on-board
+    fusion does); real-motion segments turn the head and show up in the gyro.
+    """
+    mount = axis_quat(MOUNT, 70.0)
+    heading = drift = 0.0
+    out, t = [], 0.0
+    for secs, rate, real in segments:
+        for _ in range(int(secs * hz)):
+            dt = 1.0 / hz
+            if real:
+                heading += rate * dt
+            else:
+                drift += rate * dt
+            t += dt
+            q = qmul(axis_quat(UP, heading + drift), mount)
+            m = ht.quat_to_mat(q)
+            g_body = tuple(m[k][2] * 1000.0 for k in range(3))              # R^T * up
+            gyro_world = (0.0, 0.0, rate if real else 0.0)
+            gyro = tuple(sum(m[k][i] * gyro_world[k] for k in range(3)) for i in range(3))
+            s = p.parse_block(p.encode_block(int(t * 1e9), gyro, g_body, q), t)   # Q15 quantisation
+            out.append((s, heading))
+    return out
+
+
+def run(dc, samples):
+    res, last = [], None
+    for s, true_heading in samples:
+        dt = (s.ts_ns - last) / 1e9 if last else 0.0
+        last = s.ts_ns
+        res.append((dc.update(s.quat, s.gyro, s.gravity, dt), true_heading))
+    return res
+
+
+class TestDrift(unittest.TestCase):
+    def test_removes_slow_drift_while_still(self):
+        res = run(DriftCompensator(), synth([(240, 2.5 / 60, False)]))       # +2.5 deg/min, head still
+        q_a, q_b = res[6000][0], res[-1][0]                                   # after 1 min warm-up
+        residual = twist_deg(q_a, q_b, UP) / 3.0                              # deg/min over 3 min
+        self.assertLess(abs(residual), 0.2)
+
+    def test_keeps_real_head_turn(self):
+        res = run(DriftCompensator(), synth([(60, 2.5 / 60, False), (1.0, 30.0, True), (30, 2.5 / 60, False)]))
+        before, after = res[5999][0], res[-1][0]
+        turned = twist_deg(before, after, UP)
+        self.assertAlmostEqual(turned, 30.0, delta=0.5)
+
+    def test_slow_real_motion_is_only_nibbled(self):
+        # 0.5 deg/s is below the still threshold; the cap limits what is absorbed to 6 deg/min
+        res = run(DriftCompensator(), synth([(20, 0.0, False), (20, 0.5, True)]))
+        turned = twist_deg(res[1999][0], res[-1][0], UP)
+        self.assertGreater(turned, 10.0 - 2.1)          # true 10 deg, at most 20 s * 0.1 deg/s absorbed
+
+    def test_disabled_is_identity(self):
+        dc = DriftCompensator(enabled=False)
+        for (q, _), (s, _) in zip(run(dc, synth([(10, 5.0 / 60, False)])), synth([(10, 5.0 / 60, False)])):
+            self.assertEqual(q, s.quat)
+
+    def test_none_passthrough(self):
+        self.assertIsNone(DriftCompensator().update(None, (0, 0, 0), (0, 0, 1000), 0.01))
+
+
+RECORDINGS = [
+    ("soak-20261107-225643", [(1.0, 5.9)]),       # head resting 5 min
+    ("capture-20261107-224116", [(0.2, 1.95), (7.5, 8.4)]),
+]
+
+
+class TestDriftOnRecordings(unittest.TestCase):
+    """Target from the plan: residual still-drift below 0.2 deg/min on the real Pro 3 data."""
+
+    def test_recordings(self):
+        for name, ranges in RECORDINGS:
+            path = os.path.join(ROOT, "tools", name, "soak.csv")
+            if not os.path.exists(path):
+                self.skipTest(f"{name} not present")
+            rows = read_soak_csv(path)
+            dc, out, prev = DriftCompensator(), [], None
+            for t, ts, w, g, q in rows:
+                qc = dc.update(q, w, g, (ts - prev) / 1e9 if prev else 0.0)
+                prev = ts
+                if qc is not None:
+                    out.append((t, q, qc))
+            t0 = rows[0][0]
+            for a, b in ranges:
+                seg = [o for o in out if a <= (o[0] - t0) / 60 <= b]
+                mins = (seg[-1][0] - seg[0][0]) / 60
+                raw = twist_deg(seg[0][1], seg[-1][1], dc.up) / mins
+                cor = twist_deg(seg[0][2], seg[-1][2], dc.up) / mins
+                with self.subTest(recording=name, minutes=(a, b)):
+                    self.assertGreater(abs(raw), 1.0)            # the drift really is there
+                    self.assertLess(abs(cor), 0.2)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,22 @@
+Device 34:0E:22:54:5B:C4 (public)
+	Name: AirPods Pro - Find My
+	Alias: AirPods Pro - Find My
+	Class: 0x00240418 (2360344)
+	Icon: audio-headphones
+	Paired: yes
+	Bonded: yes
+	Trusted: yes
+	Blocked: no
+	Connected: yes
+	LegacyPairing: no
+	CablePairing: no
+	UUID: Service Discovery Serve.. (00001000-0000-1000-8000-00805f9b34fb)
+	UUID: Audio Sink                (0000110b-0000-1000-8000-00805f9b34fb)
+	UUID: A/V Remote Control Target (0000110c-0000-1000-8000-00805f9b34fb)
+	UUID: A/V Remote Control        (0000110e-0000-1000-8000-00805f9b34fb)
+	UUID: Handsfree                 (0000111e-0000-1000-8000-00805f9b34fb)
+	UUID: PnP Information           (00001200-0000-1000-8000-00805f9b34fb)
+	UUID: Generic Attribute Profile (00001801-0000-1000-8000-00805f9b34fb)
+	UUID: Vendor specific           (4715650b-5e9d-4ac2-b898-a4fc0aa5df78)
+	UUID: Vendor specific           (74ec2172-0bad-4d01-8f77-997b2be0722a)
+	Modalias: bluetooth:v004Cp2027d215C

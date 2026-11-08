@@ -1,0 +1,173 @@
+"""Build the Windows app: dist/AirPodsGyro/AirPodsGyro.exe (+ a .zip), then self-test the .exe.
+
+    .venv\\Scripts\\python airpodsgyro\\packaging\\build.py
+
+Needs the venv from requirements.txt plus PyInstaller (see packaging/requirements-build.txt).
+One-folder build (not one-file): starts faster, and games load the DLLs from a stable path.
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import zipfile
+
+PKG = os.path.dirname(os.path.abspath(__file__))
+APP = os.path.dirname(PKG)
+ROOT = os.path.dirname(APP)
+BUILD = os.path.join(ROOT, "build")
+DIST = os.path.join(ROOT, "dist")
+NAME = "AirPodsGyro"
+
+sys.path.insert(0, APP)
+from version import __version__  # noqa: E402
+
+
+def make_icon(path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+
+    from gui.widgets import app_icon
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    ok = app_icon().pixmap(256, 256).save(path, "ICO")
+    if not ok:
+        raise SystemExit("could not write the .ico (Qt imageformats plugin missing?)")
+
+
+def licences(dest):
+    os.makedirs(dest, exist_ok=True)
+    copies = {
+        "mousepods-LICENSE.txt": os.path.join(ROOT, "mousepods-main", "LICENSE"),
+        "mousepods-NOTICE.txt": os.path.join(ROOT, "mousepods-main", "NOTICE"),
+        "opentrack-LICENSING.txt": os.path.join(APP, "vendor", "opentrack", "OPENTRACK-LICENSING.txt"),
+        "opentrack-npclient-CREDIT.txt": os.path.join(APP, "vendor", "opentrack", "README-CREDIT.txt"),
+        "facetracknoir-COPYING.txt": os.path.join(APP, "vendor", "opentrack", "FACETRACKNOIR-COPYING.txt"),
+    }
+    for name, src in copies.items():
+        if os.path.exists(src):
+            shutil.copy2(src, os.path.join(dest, name))
+    import PySide6
+    pyside = os.path.dirname(PySide6.__file__)
+    for cand in ("LICENSES", "LICENSE.LGPLv3", "LICENSE"):
+        p = os.path.join(pyside, cand)
+        if os.path.isfile(p):
+            shutil.copy2(p, os.path.join(dest, "PySide6-" + cand + ".txt"))
+    with open(os.path.join(dest, "README.txt"), "w", encoding="utf-8") as f:
+        f.write("Third-party components bundled with AirPodsGyro:\n"
+                "- mousepods (starman-tech), Apache-2.0: AirPods protocol code (adapted in core/).\n"
+                "- opentrack, ISC: NPClient(64).dll, freetrackclient(64).dll, TrackIR.exe helper, games list.\n"
+                "- Qt for Python (PySide6) and Qt, LGPL-3.0: dynamically linked; the Qt DLLs in _internal\\ can\n"
+                "  be replaced with your own build. Source: https://code.qt.io/\n"
+                "- Python, PSF licence.\n")
+
+
+# Pulled in by PySide6 hooks/plugins but unused by this widgets-only app (~45 MB). The self-test
+# below runs after pruning, so anything still needed shows up as a FAIL.
+PRUNE = [
+    "PySide6/opengl32sw.dll", "PySide6/Qt6Pdf.dll", "PySide6/Qt6Qml.dll", "PySide6/Qt6QmlMeta.dll",
+    "PySide6/Qt6QmlModels.dll", "PySide6/Qt6QmlWorkerScript.dll", "PySide6/Qt6Quick.dll",
+    "PySide6/Qt6VirtualKeyboard.dll", "PySide6/Qt6Network.dll", "PySide6/Qt6Svg.dll", "PySide6/Qt6OpenGL.dll",
+    "PySide6/plugins/generic", "PySide6/plugins/iconengines", "PySide6/plugins/platforminputcontexts",
+    "PySide6/plugins/platforms/qdirect2d.dll", "PySide6/plugins/platforms/qminimal.dll",
+    "libssl-3.dll", "_ssl.pyd",
+]
+KEEP_IMAGEFORMATS = {"qico.dll"}
+
+
+def prune(internal):
+    freed = 0
+    for rel in PRUNE:
+        p = os.path.join(internal, *rel.split("/"))
+        if os.path.isdir(p):
+            freed += sum(os.path.getsize(os.path.join(b, f)) for b, _, fs in os.walk(p) for f in fs)
+            shutil.rmtree(p)
+        elif os.path.isfile(p):
+            freed += os.path.getsize(p)
+            os.remove(p)
+    fmt = os.path.join(internal, "PySide6", "plugins", "imageformats")
+    for fn in os.listdir(fmt) if os.path.isdir(fmt) else []:
+        if fn not in KEEP_IMAGEFORMATS:
+            freed += os.path.getsize(os.path.join(fmt, fn))
+            os.remove(os.path.join(fmt, fn))
+    print(f"pruned {freed / 1e6:.0f} MB of unused Qt parts")
+
+
+def write_readme(path):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(f"""AirPodsGyro {__version__}
+AirPods head tracking for racing and flight sims.
+
+Start: AirPodsGyro.exe (keeps running in the tray when you close the window).
+
+First run
+ 1. Source tab: choose where the head tracking comes from.
+    The Windows Bluetooth driver is not finished yet. To try the app now, choose
+    "Recording" and a soak.csv file (from the project's tools folder).
+ 2. Calibrate... once (three held poses, about 20 seconds).
+ 3. Games & output: "Send head tracking to games" makes TrackIR games
+    (iRacing, MSFS 2020/2024, DCS, ACC, ...) see the app as TrackIR.
+    Turn on TrackIR / head tracking in the game's own settings.
+ 4. Recenter: Ctrl+Alt+R (also while the game has focus). Pause: Ctrl+Alt+P.
+
+Settings: %APPDATA%\\AirPodsGyro
+Licences: licenses\\
+""")
+
+
+def main():
+    shutil.rmtree(os.path.join(BUILD, NAME), ignore_errors=True)
+    shutil.rmtree(os.path.join(DIST, NAME), ignore_errors=True)
+    os.makedirs(BUILD, exist_ok=True)
+    icon = os.path.join(BUILD, "airpodsgyro.ico")
+    make_icon(icon)
+
+    sep = os.pathsep
+    args = [
+        sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--windowed", "--onedir",
+        "--name", NAME, "--icon", icon,
+        "--distpath", DIST, "--workpath", BUILD, "--specpath", BUILD,
+        "--paths", APP,
+        "--add-data", f"{os.path.join(APP, 'vendor', 'opentrack')}{sep}vendor/opentrack",
+        "--hidden-import", "core.transport.bluez", "--hidden-import", "core.transport.replay",
+        "--hidden-import", "core.transport.windriver",
+        "--exclude-module", "tkinter", "--exclude-module", "unittest.mock",
+        "--exclude-module", "PySide6.QtNetwork", "--exclude-module", "PySide6.QtQml",
+        "--exclude-module", "PySide6.QtQuick", "--exclude-module", "PySide6.QtWebEngineCore",
+        "--exclude-module", "PySide6.QtPdf", "--exclude-module", "PySide6.QtMultimedia",
+        os.path.join(APP, "app.py"),
+    ]
+    print("running PyInstaller…", flush=True)
+    subprocess.run(args, check=True)
+
+    out = os.path.join(DIST, NAME)
+    prune(os.path.join(out, "_internal"))
+    licences(os.path.join(out, "licenses"))
+    write_readme(os.path.join(out, "README.txt"))
+
+    # self-test the frozen exe (paths, bundled DLLs, Qt plugins)
+    st = os.path.join(BUILD, "selftest.json")
+    if os.path.exists(st):
+        os.remove(st)
+    # real Windows platform plugin (qwindows); the self-test renders off-screen without showing a window
+    env = {k: v for k, v in os.environ.items() if k != "QT_QPA_PLATFORM"}
+    rc = subprocess.run([os.path.join(out, NAME + ".exe"), "--selftest", st], env=env, timeout=120).returncode
+    with open(st, encoding="utf-8") as f:
+        result = json.load(f)
+    for name, c in result["checks"].items():
+        print(("PASS " if c["ok"] else "FAIL ") + name + ("" if c["ok"] else "\n" + c["info"]))
+    if rc != 0 or not result["ok"] or not result["frozen"]:
+        raise SystemExit("self-test of the built exe FAILED")
+
+    zip_path = os.path.join(DIST, f"{NAME}-{__version__}-win64.zip")
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for base, _, files in os.walk(out):
+            for fn in files:
+                full = os.path.join(base, fn)
+                z.write(full, os.path.join(NAME, os.path.relpath(full, out)))
+    size = sum(os.path.getsize(os.path.join(b, f)) for b, _, fs in os.walk(out) for f in fs)
+    print(f"built {out} ({size / 1e6:.0f} MB), zip {zip_path} ({os.path.getsize(zip_path) / 1e6:.0f} MB)")
+
+
+if __name__ == "__main__":
+    main()

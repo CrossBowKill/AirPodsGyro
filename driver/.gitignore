@@ -1,0 +1,4 @@
+packages/
+obj/
+out/
+tools/nuget.exe

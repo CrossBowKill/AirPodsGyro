@@ -1,0 +1,26 @@
+[    3.020891] usb 1-9: Product: Bluetooth Radio
+[    9.583254] Bluetooth: Core ver 2.22
+[    9.583271] NET: Registered PF_BLUETOOTH protocol family
+[    9.583272] Bluetooth: HCI device and connection manager initialized
+[    9.583278] Bluetooth: HCI socket layer initialized
+[    9.583279] Bluetooth: L2CAP socket layer initialized
+[    9.583281] Bluetooth: SCO socket layer initialized
+[    9.644467] usbcore: registered new interface driver btusb
+[    9.647208] Bluetooth: hci0: RTL: examining hci_ver=0c hci_rev=000a lmp_ver=0c lmp_subver=8922
+[    9.648206] Bluetooth: hci0: RTL: rom_version status=0 version=1
+[    9.649205] Bluetooth: hci0: RTL: btrtl_initialize: key id 0
+[    9.649206] Bluetooth: hci0: RTL: loading rtl_bt/rtl8922au_fw.bin
+[    9.653223] Bluetooth: hci0: RTL: loading rtl_bt/rtl8922au_config.bin
+[    9.655811] Bluetooth: hci0: RTL: cfg_sz 6, total sz 71307
+[   10.279204] Bluetooth: hci0: RTL: fw version 0x41c0c905
+[   10.372203] Bluetooth: hci0: AOSP extensions version v1.00
+[   12.453188] Bluetooth: hci0: Malformed MSFT vendor event: 0x00
+[   21.405881] Bluetooth: BNEP (Ethernet Emulation) ver 1.3
+[   21.405884] Bluetooth: BNEP filters: protocol multicast
+[   21.405887] Bluetooth: BNEP socket layer initialized
+[   21.406363] Bluetooth: MGMT ver 1.23
+[   21.694061] Bluetooth: hci0: Malformed MSFT vendor event: 0x00
+[   21.777062] Bluetooth: hci0: AOSP extensions version v1.00
+[   75.842041] Bluetooth: RFCOMM TTY layer initialized
+[   75.842049] Bluetooth: RFCOMM socket layer initialized
+[   75.842053] Bluetooth: RFCOMM ver 1.11
