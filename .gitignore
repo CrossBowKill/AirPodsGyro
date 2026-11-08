@@ -14,3 +14,27 @@ AirPodsGyro-main (Copy)/
 # Build output (airpodsgyro/packaging/build.py)
 build/
 dist/
+
+# AI assistant / workspace tooling (local only, not part of the project)
+.claude/
+.agents/
+.codex/
+.cursor/
+.vscode/
+.idea/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+Daily Notes/
+Scratchpad.md
+Task Board.md
+memory/
+playbooks/
+
+# Personal notes (README.md covers the project)
+Project.md
+
+# OS clutter
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -57,12 +57,12 @@ class GlobalHotkeys(QObject, QAbstractNativeEventFilter):
             try:
                 mods, vk = parse(combo)
             except ValueError as e:
-                errors[name] = str(e)
+                errors[name] = f"is not a valid key ({e})"
                 continue
             if self.user32.RegisterHotKey(None, i, mods | MOD_NOREPEAT, vk):
                 self.ids[i] = name
             else:
-                errors[name] = f"{combo} is already used by another program"
+                errors[name] = "is already used by another program"
         return errors
 
     def clear(self):

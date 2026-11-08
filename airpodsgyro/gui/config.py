@@ -28,6 +28,7 @@ DEFAULTS = {
                 "udp": False, "udp_host": "127.0.0.1", "udp_port": 4242},
     "hotkeys": {"recenter": "ctrl+alt+r", "pause": "ctrl+alt+p"},
     "autostart_tracking": True,
+    "theme": "system",
     "minimize_to_tray": True,
     "settings": Settings().to_dict(),
 }

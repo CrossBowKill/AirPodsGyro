@@ -136,17 +136,16 @@ def main():
         i = sys.argv.index("--selftest")
         return selftest(sys.argv[i + 1] if i + 1 < len(sys.argv) else "selftest.json")
     from PySide6.QtCore import QDir, QLockFile
-    from PySide6.QtWidgets import QApplication, QMessageBox, QStyleFactory
+    from PySide6.QtWidgets import QApplication, QMessageBox
 
-    from gui.config import config_dir
+    from gui import theme
+    from gui.config import config_dir, load_config
     from gui.main_window import MainWindow
 
     app = QApplication(sys.argv)
     app.setApplicationName("AirPodsGyro")
     app.setQuitOnLastWindowClosed(False)          # keeps running in the tray
-    styles = {s.lower(): s for s in QStyleFactory.keys()}
-    if "windows11" in styles:
-        app.setStyle(styles["windows11"])
+    theme.apply(app, load_config().get("theme", "system"))
 
     lock = QLockFile(QDir(config_dir()).filePath("app.lock"))
     if not lock.tryLock(100):

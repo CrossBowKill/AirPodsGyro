@@ -6,6 +6,8 @@ from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QHBoxLayout, QLabel, Q
 
 from core import calibrate
 
+from . import theme
+
 SETTLE_MS = 300      # ignore the moment the button is pressed
 HOLD_MS = 800        # then average this long
 
@@ -14,22 +16,25 @@ class CalibrationWizard(QDialog):
     def __init__(self, pipeline, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Calibrate head tracking")
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(500)
         self.pipeline = pipeline
         self.poses = {}
         self.step = 0
         self.result = None
 
         self.title = QLabel()
-        self.title.setStyleSheet("font-size: 15pt; font-weight: 600;")
+        self.title.setFont(theme.font("display", size=theme.SIZE["title"], weight=600))
         self.text = QLabel()
+        self.text.setFont(theme.font("ui", size=11))
         self.text.setWordWrap(True)
         self.feedback = QLabel()
+        self.feedback.setProperty("role", "muted")
         self.feedback.setWordWrap(True)
         self.progress = QProgressBar()
         self.progress.setRange(0, len(calibrate.POSES))
         self.progress.setTextVisible(False)
-        self.capture_btn = QPushButton("Hold it - capture")
+        self.capture_btn = QPushButton("Hold it, capture")
+        self.capture_btn.setProperty("role", "primary")
         self.capture_btn.setDefault(True)
         self.capture_btn.clicked.connect(self.capture)
         buttons = QDialogButtonBox(QDialogButtonBox.Cancel)
@@ -43,6 +48,7 @@ class CalibrationWizard(QDialog):
         intro = QLabel("Sit as you do when playing, both AirPods in. Hold each pose still, then press "
                        "the button (or Enter). Recalibrate if you take an AirPod out and back in.")
         intro.setWordWrap(True)
+        intro.setProperty("role", "muted")
         lay.addWidget(intro)
         lay.addSpacing(8)
         lay.addWidget(self.title)
@@ -75,7 +81,7 @@ class CalibrationWizard(QDialog):
         try:
             self.poses[key] = calibrate.pose_from_window(self.pipeline.end_capture())
         except calibrate.PoseError as e:
-            self.feedback.setText(f"<span style='color:#cf222e'>{e}. Try again.</span>")
+            self.feedback.setText(f"<span style='color:{theme.current()['bad']}'>{e}. Try again.</span>")
             return
         self.feedback.setText("")
         self.step += 1
@@ -85,7 +91,7 @@ class CalibrationWizard(QDialog):
         try:
             self.result = calibrate.solve(self.poses, self.pipeline.session.pid if self.pipeline.session else "0000")
         except ValueError as e:
-            self.feedback.setText(f"<span style='color:#cf222e'>Calibration failed: {e}.</span> "
+            self.feedback.setText(f"<span style='color:{theme.current()['bad']}'>Calibration failed: {e}.</span> "
                                   "Starting again from step 1.")
             self.poses, self.step = {}, 0
             self._show_step()
