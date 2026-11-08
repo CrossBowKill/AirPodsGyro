@@ -39,8 +39,10 @@ AirPodsL2cap.sys
 AddReg = AirPodsL2cap_HW_AddReg
 
 [AirPodsL2cap_HW_AddReg]
-; SYSTEM and Administrators: all; interactive users: read/write (the app runs unelevated)
-HKR,,Security,,"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"
+; Deny remote desktop (S-1-5-14) and network logons first; then SYSTEM and Administrators: all;
+; users signed in at this PC: read/write (the app runs unelevated). The driver also allows only one
+; owning handle per AirPods, so a second user cannot take over or close a running session.
+HKR,,Security,,"D:P(D;;GA;;;S-1-5-14)(D;;GA;;;NU)(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"
 
 [AirPodsL2cap_Inst.NT.Services]
 AddService = AirPodsL2cap, 0x00000002, AirPodsL2cap_Service_Inst

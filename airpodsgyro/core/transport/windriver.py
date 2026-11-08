@@ -1,7 +1,7 @@
 """Windows transport: the AAP L2CAP channel through our AirPodsL2cap.sys driver (driver/AirPodsL2cap).
 
 The driver binds to the AirPods' Apple service device node and exposes a device interface:
-  IOCTL_APL2_CONNECT     open L2CAP PSM 0x1001 (in-MTU 2582, encrypted link)
+  IOCTL_APL2_CONNECT     open L2CAP PSM 0x1001 (in-MTU 2582, encrypted link; fixed by the driver)
   ReadFile / WriteFile   one L2CAP packet each
   IOCTL_APL2_GET_INFO    state, AirPods address, MTUs, counters
 Keep the constants below in sync with driver/AirPodsL2cap/public.h.
@@ -16,11 +16,21 @@ from ctypes import wintypes
 from .base import Transport, TransportError
 
 GUID_DEVINTERFACE_AIRPODS_L2CAP = "{6F3A2C41-8D7E-4B8A-9C51-2E7D14A9630B}"
-IOCTL_APL2_GET_INFO = 0x222000
-IOCTL_APL2_CONNECT = 0x222004
-IOCTL_APL2_DISCONNECT = 0x222008
+IOCTL_APL2_GET_INFO = 0x226000      # FILE_READ_ACCESS
+IOCTL_APL2_CONNECT = 0x22E004       # FILE_READ_ACCESS | FILE_WRITE_ACCESS
+IOCTL_APL2_DISCONNECT = 0x22E008
+INFO_IN_USE, INFO_MINE = 0x1, 0x2
+# head-tracking AirPods first when several Apple devices with the driver are paired
+PID_PREFERENCE = ("2027", "2024", "2014", "200e", "2013")
+ERROR_ACCESS_DENIED, ERROR_BUSY, ERROR_DEVICE_NOT_CONNECTED, ERROR_INVALID_PARAMETER = 5, 170, 1167, 87
+FRIENDLY = {
+    ERROR_BUSY: "the AirPods are in use by another program (close it first)",
+    ERROR_ACCESS_DENIED: "access denied (the AirPods are in use by another program, or this is a remote session)",
+    ERROR_DEVICE_NOT_CONNECTED: "the AirPods channel is not connected",
+    ERROR_INVALID_PARAMETER: "the driver rejected the request (driver and app versions do not match?)",
+}
 STATES = {0: "disconnected", 1: "connected", 2: "remote disconnected"}
-INFO_FMT = "<IIQHHHHiIII"            # APL2_INFO, 48 bytes
+INFO_FMT = "<IIQHHHHiIII"            # APL2_INFO, 40 bytes
 CONNECT_FMT = "<HHI"                 # APL2_CONNECT_IN, 8 bytes
 READ_SIZE = 4096
 
@@ -100,8 +110,22 @@ def format_addr(a):
 def parse_info(raw):
     v = struct.unpack(INFO_FMT, raw)
     return {"version": v[0], "state": STATES.get(v[1], v[1]), "addr": format_addr(v[2]), "psm": v[3],
-            "in_mtu": v[4], "out_mtu": v[5], "last_status": f"0x{v[7] & 0xFFFFFFFF:08X}",
-            "reads": v[8], "writes": v[9]}
+            "in_mtu": v[4], "out_mtu": v[5], "in_use": bool(v[6] & INFO_IN_USE), "mine": bool(v[6] & INFO_MINE),
+            "last_status": f"0x{v[7] & 0xFFFFFFFF:08X}", "reads": v[8], "writes": v[9]}
+
+
+def _err(what, code):
+    return TransportError(f"{what}: {FRIENDLY.get(code, f'error {code}')}")
+
+
+def _pid(path):
+    m = re.search(r"PID&([0-9A-Fa-f]{4})", path or "")
+    return m.group(1).lower() if m else "0000"
+
+
+def _rank(path):
+    pid = _pid(path)
+    return PID_PREFERENCE.index(pid) if pid in PID_PREFERENCE else len(PID_PREFERENCE)
 
 
 class _Device:
@@ -127,13 +151,13 @@ class _Device:
             if not fn(self.h, *args, ctypes.byref(n), ctypes.byref(ov)):
                 err = ctypes.get_last_error()
                 if err != ERROR_IO_PENDING:
-                    raise TransportError(f"{fn.__name__} failed (error {err})")
+                    raise _err(fn.__name__, err)
                 if self.k32.WaitForSingleObject(ov.hEvent, timeout_ms) == WAIT_TIMEOUT:
                     self.k32.CancelIoEx(self.h, ctypes.byref(ov))
                     self.k32.GetOverlappedResult(self.h, ctypes.byref(ov), ctypes.byref(n), True)
                     raise TransportError(f"{fn.__name__} timed out")
                 if not self.k32.GetOverlappedResult(self.h, ctypes.byref(ov), ctypes.byref(n), True):
-                    raise TransportError(f"{fn.__name__} failed (error {ctypes.get_last_error()})")
+                    raise _err(fn.__name__, ctypes.get_last_error())
             return n.value
         finally:
             self.k32.CloseHandle(ov.hEvent)
@@ -160,14 +184,14 @@ class _Device:
                 return self._rd_buf.raw[:n.value]
             err = ctypes.get_last_error()
             if err != ERROR_IO_PENDING:
-                raise TransportError(f"read failed (error {err}): link lost?")
+                raise _err("read failed, link lost?", err)
             self._rd_pending = True
         if self.k32.WaitForSingleObject(self._rd_ov.hEvent, max(0, int(timeout_s * 1000))) == WAIT_TIMEOUT:
             return None
         self._rd_pending = False
         n = wintypes.DWORD(0)
         if not self.k32.GetOverlappedResult(self.h, ctypes.byref(self._rd_ov), ctypes.byref(n), False):
-            raise TransportError(f"read failed (error {ctypes.get_last_error()}): link lost?")
+            raise _err("read failed, link lost?", ctypes.get_last_error())
         return self._rd_buf.raw[:n.value]
 
     def close(self):
@@ -183,10 +207,10 @@ class _Device:
 
 
 class WinDriverTransport(Transport):
-    def __init__(self, psm=0x1001, in_mtu=2582, channel_flags=0):
+    def __init__(self, in_mtu=2582):
         if sys.platform != "win32":
             raise TransportError("the AirPodsGyro driver transport is Windows only")
-        self.psm, self.in_mtu, self.flags = psm, in_mtu, channel_flags
+        self.in_mtu = in_mtu      # PSM 0x1001 and link encryption are fixed in the driver
         self.dev = None
         self.path = None
         self.info = {}
@@ -196,14 +220,18 @@ class WinDriverTransport(Transport):
         if not paths:
             raise TransportError("AirPodsGyro driver not found: install it (driver/install.ps1) and pair the AirPods")
         last = None
-        for path in paths:
-            dev = _Device(path)
+        for path in sorted(paths, key=_rank):         # try every paired AirPods, head-tracking models first
+            try:
+                dev = _Device(path)
+            except TransportError as e:
+                last = e
+                continue
             try:
                 info = dev.info()
                 if addr not in ("auto", "", None) and info["addr"].upper() != addr.upper():
                     dev.close()
                     continue
-                dev.ioctl(IOCTL_APL2_CONNECT, struct.pack(CONNECT_FMT, self.psm, self.in_mtu, self.flags))
+                dev.ioctl(IOCTL_APL2_CONNECT, struct.pack(CONNECT_FMT, 0, self.in_mtu, 0))
                 self.dev, self.path, self.info = dev, path, dev.info()
                 return self.info["addr"]
             except TransportError as e:
@@ -214,8 +242,7 @@ class WinDriverTransport(Transport):
         raise TransportError(f"no AirPods with address {addr} found")
 
     def product_id(self):
-        m = re.search(r"PID&([0-9A-Fa-f]{4})", self.path or "")
-        return m.group(1).lower() if m else "0000"
+        return _pid(self.path)
 
     def send(self, pkt):
         if not self.dev:

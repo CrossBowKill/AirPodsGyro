@@ -119,7 +119,8 @@ fails unless the .exe passes its own self-test. `dist/` is not in git, so build 
 #### Build and install the driver
 
 1. Pair the AirPods with Windows (Settings → Bluetooth & devices).
-2. Build the driver. This needs no admin rights, and it creates your own test certificate:
+2. Build the driver. This needs no admin rights. Each build signs the driver with a new single-use test
+   certificate and then deletes that certificate's private key, so nothing can sign with it afterwards:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File driver\build.ps1
@@ -131,8 +132,14 @@ fails unless the .exe passes its own self-test. `dist/` is not in git, so build 
    powershell -ExecutionPolicy Bypass -File driver\install.ps1
    ```
 
-   This trusts the certificate and binds the driver to the AirPods' Apple service entry only; audio isn't touched.
-   The output should end with `driver=AirPodsL2cap problem=0`.
+   This copies the package to an admin-only folder and checks that both files are signed by the certificate the
+   build pinned. It then shows the certificate thumbprint and the driver's SHA-256 and asks before going on. Check
+   that they match what `build.ps1` printed. It trusts that one certificate, binds the driver to the AirPods' Apple
+   service entry only (audio isn't touched), and removes older AirPodsGyro drivers and certificates. The output
+   should end with `driver=AirPodsL2cap problem=0`.
+
+   Only one program at a time can use the AirPods channel: a second one gets "in use by another program".
+   Remote-desktop sessions can't open it at all.
 
 #### Test it
 
@@ -155,18 +162,19 @@ Start the app (`.venv\Scripts\python airpodsgyro\app.py` or the .exe). On the **
 
 #### Undo everything
 
-1. In an admin terminal, run `powershell -ExecutionPolicy Bypass -File driver\install.ps1 -Uninstall`.
+1. In an admin terminal, run `powershell -ExecutionPolicy Bypass -File driver\install.ps1 -Uninstall`. This removes
+   the driver and every AirPodsGyro certificate from the machine trust stores, and reports anything it couldn't
+   remove.
 2. Run `bcdedit /set testsigning off`, then reboot.
 3. In the BIOS, set Secure Boot back to Enabled. If BitLocker is on, suspend it first, as in "Prepare Windows".
-4. Optional: remove the "AirPodsGyro Test Signing" certificate in `certlm.msc`, under *Trusted Root* and
-   *Trusted Publishers*.
 
 #### If something fails
 
 | Symptom | Likely cause |
 | --- | --- |
 | `install.ps1` shows `problem=52` | Test-signing mode is off, or you didn't reboot after turning it on |
-| `problem=39` or `31` | Memory integrity (Core isolation) blocked the driver; turn it off temporarily |
+| `problem=39` or `31` | Memory integrity (Core isolation) blocked the driver. Turning it off lowers protection for the whole PC; only do it to test, and turn it back on afterwards |
+| "in use by another program" | Another AirPodsGyro window, `bridge.py` or `apl2_probe.py` holds the channel; close it |
 | `apl2_probe` finds 0 interfaces | AirPods aren't paired or connected, or the driver isn't installed |
 | Connects but no samples | Take both AirPods out and put them back in, then run it again |
 
@@ -212,23 +220,6 @@ from pods-head-tracker is no longer used. The blockers are the cost and the busi
 ## Use of AI
 
 This project was built with heavy help from an AI coding assistant: Claude by Anthropic, through Claude Code.
-
-- **What the AI did:** it wrote most of the code and documentation. That includes the protocol port, the session and
-  drift correction, the game output, the desktop app and its design, the Windows kernel driver with its build and
-  install scripts, the tests, and this README. It also did the research behind the design decisions, such as the
-  driver binding point and the signing options.
-- **What the human did:** the idea and goals, all hardware work (the Ubuntu live-USB tests, the real AirPods Pro 3,
-  installing and testing the driver on Windows), the decisions along the way, and reviewing the results.
-- **How it was checked:** the claims in this README come from things that actually ran:
-  - unit tests;
-  - a byte-for-byte comparison with mousepods' protocol code;
-  - full replays of real AirPods recordings, which reproduce the original Linux results;
-  - opentrack's own `NPClient64.dll` reading the app's output;
-  - a self-test of the packaged .exe;
-  - live runs with real AirPods on Linux and Windows.
-- **What has not been checked:** nobody independent has reviewed the code. In particular the kernel driver
-  (`driver/AirPodsL2cap/driver.c`) is AI-written and has only been tested on one PC. Kernel code can crash Windows,
-  so read it before you install it, and only use it on a machine where you accept that risk.
 
 ## Credits
 

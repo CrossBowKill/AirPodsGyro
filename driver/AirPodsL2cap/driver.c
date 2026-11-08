@@ -1,13 +1,22 @@
 /*
- * AirPodsL2cap.sys: KMDF Bluetooth profile driver that gives user mode one L2CAP channel to AirPods.
+ * AirPodsL2cap.sys: KMDF Bluetooth profile driver that gives one user-mode app one L2CAP channel to AirPods.
  *
  * Binds to the BTHENUM device node Windows creates for Apple's service {74ec2172-...} on paired AirPods
  * (no inbox driver uses it), so the A2DP / hands-free audio stack is never touched. Pattern follows
  * Microsoft's Windows-driver-samples/bluetooth/bthecho client (MS-PL), reduced to what we need:
  *
- *   IOCTL_APL2_CONNECT     BRB_L2CA_OPEN_CHANNEL to PSM 0x1001, in-MTU 2582, encrypted link
- *   ReadFile / WriteFile   the user's request is forwarded as one BRB_L2CA_ACL_TRANSFER
- *   IOCTL_APL2_DISCONNECT  BRB_L2CA_CLOSE_CHANNEL (also on handle close and device removal)
+ *   IOCTL_APL2_CONNECT     BRB_L2CA_OPEN_CHANNEL to PSM 0x1001, encrypted + authenticated link (fixed)
+ *   ReadFile / WriteFile   the request is forwarded as one BRB_L2CA_ACL_TRANSFER
+ *   IOCTL_APL2_DISCONNECT  BRB_L2CA_CLOSE_CHANNEL (also when the owning handle closes, and on removal)
+ *
+ * Safety rules (red-team review 2026-11-08):
+ *   - One owner: the file handle that connected owns the channel. Other handles may only GET_INFO; they can
+ *     neither transfer nor close it, and their CONNECT fails with STATUS_DEVICE_BUSY.
+ *   - No transfer ever reaches bthport with a closed channel handle: every transfer is tracked from before
+ *     it is sent until it completes; closing first stops new transfers, cancels the tracked ones and waits
+ *     for them, and only then sends BRB_L2CA_CLOSE_CHANNEL.
+ *   - PSM and link security are fixed in the driver; user mode cannot choose them.
+ *   - A disconnect indication only affects the channel it belongs to.
  */
 
 #include <ntddk.h>
@@ -22,7 +31,11 @@
 
 #define APL2_TAG 'L2PA'
 #define APL2_LOG(fmt, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "AirPodsL2cap: " fmt "\n", __VA_ARGS__)
-#define APL2_MIN_MTU 48
+#define APL2_MIN_MTU 672
+#define APL2_MAX_MTU 4096
+#define APL2_CHANNEL_FLAGS (CF_ROLE_EITHER | CF_LINK_AUTHENTICATED | CF_LINK_ENCRYPTED)
+#define APL2_MAX_CANCEL 64
+#define APL2_DRAIN_TIMEOUT_MS 5000
 
 typedef struct _DEVICE_CONTEXT {
     WDFDEVICE Device;
@@ -31,9 +44,13 @@ typedef struct _DEVICE_CONTEXT {
     BOOLEAN HaveBth;
     BTH_ADDR Remote;
     WDFWAITLOCK ConnectLock;        /* serialises connect / close (PASSIVE_LEVEL) */
-    WDFSPINLOCK Lock;               /* protects Channel + State for the I/O path */
+    WDFSPINLOCK Lock;               /* protects everything below */
     L2CAP_CHANNEL_HANDLE Channel;
     LONG State;
+    BOOLEAN Closing;                /* no new transfers while a close drains */
+    WDFFILEOBJECT Owner;            /* handle that owns the channel, or NULL */
+    WDFCOLLECTION InFlight;         /* transfers handed to bthport and not yet completed */
+    KEVENT NoTransfers;             /* signalled while InFlight is empty */
     USHORT Psm;
     USHORT InMtu;
     USHORT OutMtu;
@@ -60,29 +77,44 @@ EVT_WDF_REQUEST_COMPLETION_ROUTINE Apl2TransferComplete;
 
 /* ------------------------------------------------------------------------------------------ helpers */
 
+/* No WDF timeout: a timed-out OPEN could leave bthport with an open channel we never learn about. bthport
+ * applies its own L2CAP timeouts; user mode can still give up and close its handle. */
 static NTSTATUS
-Apl2SendBrbSync(_In_ PDEVICE_CONTEXT Ctx, _In_ PBRB Brb, _In_ ULONG Size, _In_ LONG TimeoutSec)
+Apl2SendBrbSync(_In_ PDEVICE_CONTEXT Ctx, _In_ PBRB Brb, _In_ ULONG Size)
 {
     WDF_MEMORY_DESCRIPTOR desc;
-    WDF_REQUEST_SEND_OPTIONS opts;
-
     WDF_MEMORY_DESCRIPTOR_INIT_BUFFER(&desc, Brb, Size);
-    WDF_REQUEST_SEND_OPTIONS_INIT(&opts, WDF_REQUEST_SEND_OPTION_TIMEOUT);
-    WDF_REQUEST_SEND_OPTIONS_SET_TIMEOUT(&opts, WDF_REL_TIMEOUT_IN_SEC(TimeoutSec));
     return WdfIoTargetSendInternalIoctlOthersSynchronously(
-        Ctx->IoTarget, NULL, IOCTL_INTERNAL_BTH_SUBMIT_BRB, &desc, NULL, NULL, &opts, NULL);
+        Ctx->IoTarget, NULL, IOCTL_INTERNAL_BTH_SUBMIT_BRB, &desc, NULL, NULL, NULL, NULL);
 }
 
 static void
 Apl2Indication(_In_opt_ PVOID Context, _In_ INDICATION_CODE Indication, _In_ PINDICATION_PARAMETERS Parameters)
 {
     PDEVICE_CONTEXT ctx = (PDEVICE_CONTEXT)Context;
-    UNREFERENCED_PARAMETER(Parameters);
-    if (ctx != NULL && Indication == IndicationRemoteDisconnect) {
-        /* Channel handle stays valid until we send CLOSE_CHANNEL (on the next connect or close). */
-        InterlockedExchange(&ctx->State, APL2_STATE_REMOTE_DISCONNECTED);
+    if (ctx == NULL || Parameters == NULL || Indication != IndicationRemoteDisconnect) {
+        return;
+    }
+    WdfSpinLockAcquire(ctx->Lock);
+    /* only the channel this indication belongs to; a late one for an old channel is ignored */
+    if (ctx->Channel != NULL && Parameters->ConnectionHandle == ctx->Channel &&
+        ctx->State == APL2_STATE_CONNECTED) {
+        ctx->State = APL2_STATE_REMOTE_DISCONNECTED;
         APL2_LOG("remote disconnect");
     }
+    WdfSpinLockRelease(ctx->Lock);
+}
+
+/* Remove a finished transfer from the in-flight set. Caller does not hold Lock. */
+static VOID
+Apl2Untrack(_In_ PDEVICE_CONTEXT Ctx, _In_ WDFREQUEST Request)
+{
+    WdfSpinLockAcquire(Ctx->Lock);
+    WdfCollectionRemove(Ctx->InFlight, Request);
+    if (WdfCollectionGetCount(Ctx->InFlight) == 0) {
+        KeSetEvent(&Ctx->NoTransfers, IO_NO_INCREMENT, FALSE);
+    }
+    WdfSpinLockRelease(Ctx->Lock);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -90,52 +122,89 @@ static NTSTATUS
 Apl2CloseChannel(_In_ PDEVICE_CONTEXT Ctx)
 {
     L2CAP_CHANNEL_HANDLE h;
+    WDFREQUEST pending[APL2_MAX_CANCEL];
+    ULONG n = 0, i, count;
+    LARGE_INTEGER timeout;
     struct _BRB_L2CA_CLOSE_CHANNEL *brb;
-    NTSTATUS status;
+    NTSTATUS status = STATUS_SUCCESS;
 
+    /* 1. stop new transfers and take the handle away from the I/O path */
     WdfSpinLockAcquire(Ctx->Lock);
+    Ctx->Closing = TRUE;
     h = Ctx->Channel;
     Ctx->Channel = NULL;
     Ctx->State = APL2_STATE_DISCONNECTED;
+    Ctx->Owner = NULL;
+    count = WdfCollectionGetCount(Ctx->InFlight);
+    for (i = 0; i < count && n < APL2_MAX_CANCEL; i++) {
+        WDFREQUEST r = (WDFREQUEST)WdfCollectionGetItem(Ctx->InFlight, i);
+        WdfObjectReference(r);          /* keeps it valid after the lock is dropped */
+        pending[n++] = r;
+    }
     WdfSpinLockRelease(Ctx->Lock);
 
-    if (h == NULL || !Ctx->HaveBth) {
-        return STATUS_SUCCESS;
+    /* 2. cancel what bthport still holds and wait until every tracked transfer has completed */
+    for (i = 0; i < n; i++) {
+        (void)WdfRequestCancelSentRequest(pending[i]);
+        WdfObjectDereference(pending[i]);
     }
-    brb = (struct _BRB_L2CA_CLOSE_CHANNEL *)Ctx->Bth.BthAllocateBrb(BRB_L2CA_CLOSE_CHANNEL, APL2_TAG);
-    if (brb == NULL) {
-        return STATUS_INSUFFICIENT_RESOURCES;
+    timeout.QuadPart = -10000LL * APL2_DRAIN_TIMEOUT_MS;
+    if (KeWaitForSingleObject(&Ctx->NoTransfers, Executive, KernelMode, FALSE, &timeout) == STATUS_TIMEOUT) {
+        APL2_LOG("close: transfers still pending after %d ms", APL2_DRAIN_TIMEOUT_MS);
     }
-    brb->BtAddress = Ctx->Remote;
-    brb->ChannelHandle = h;
-    status = Apl2SendBrbSync(Ctx, (PBRB)brb, sizeof(*brb), 10);
-    Ctx->Bth.BthFreeBrb((PBRB)brb);
-    APL2_LOG("close channel: 0x%08X", status);
+
+    /* 3. now nothing can use the handle any more: close it */
+    if (h != NULL && Ctx->HaveBth) {
+        brb = (struct _BRB_L2CA_CLOSE_CHANNEL *)Ctx->Bth.BthAllocateBrb(BRB_L2CA_CLOSE_CHANNEL, APL2_TAG);
+        if (brb == NULL) {
+            status = STATUS_INSUFFICIENT_RESOURCES;
+        } else {
+            brb->BtAddress = Ctx->Remote;
+            brb->ChannelHandle = h;
+            status = Apl2SendBrbSync(Ctx, (PBRB)brb, sizeof(*brb));
+            Ctx->Bth.BthFreeBrb((PBRB)brb);
+        }
+        APL2_LOG("close channel: 0x%08X", status);
+    }
+
+    WdfSpinLockAcquire(Ctx->Lock);
+    Ctx->Closing = FALSE;
+    WdfSpinLockRelease(Ctx->Lock);
     return status;
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
 static NTSTATUS
-Apl2OpenChannel(_In_ PDEVICE_CONTEXT Ctx, _In_ const APL2_CONNECT_IN *In)
+Apl2OpenChannel(_In_ PDEVICE_CONTEXT Ctx, _In_ WDFFILEOBJECT File, _In_ const APL2_CONNECT_IN *In)
 {
     struct _BRB_L2CA_OPEN_CHANNEL *brb;
     NTSTATUS status;
-    USHORT psm = In->Psm ? In->Psm : APL2_DEFAULT_PSM;
     USHORT mtu = In->InMtu ? In->InMtu : APL2_DEFAULT_IN_MTU;
+    WDFFILEOBJECT owner;
 
     if (!Ctx->HaveBth || Ctx->Remote == 0) {
         return STATUS_DEVICE_NOT_READY;
     }
-    (void)Apl2CloseChannel(Ctx);
+    /* fixed channel and security: user mode cannot pick another PSM or drop encryption */
+    if ((In->Psm != 0 && In->Psm != APL2_DEFAULT_PSM) || In->ChannelFlags != 0 ||
+        mtu < APL2_MIN_MTU || mtu > APL2_MAX_MTU) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    WdfSpinLockAcquire(Ctx->Lock);
+    owner = Ctx->Owner;
+    WdfSpinLockRelease(Ctx->Lock);
+    if (owner != NULL && owner != File) {
+        return STATUS_DEVICE_BUSY;      /* another app is using the AirPods channel */
+    }
+    (void)Apl2CloseChannel(Ctx);        /* our own previous channel (e.g. after a remote disconnect) */
 
     brb = (struct _BRB_L2CA_OPEN_CHANNEL *)Ctx->Bth.BthAllocateBrb(BRB_L2CA_OPEN_CHANNEL, APL2_TAG);
     if (brb == NULL) {
         return STATUS_INSUFFICIENT_RESOURCES;
     }
     brb->BtAddress = Ctx->Remote;
-    brb->Psm = psm;
-    brb->ChannelFlags = In->ChannelFlags ? In->ChannelFlags
-                                         : (CF_ROLE_EITHER | CF_LINK_AUTHENTICATED | CF_LINK_ENCRYPTED);
+    brb->Psm = APL2_DEFAULT_PSM;
+    brb->ChannelFlags = APL2_CHANNEL_FLAGS;
     brb->ConfigOut.Flags = 0;
     brb->ConfigIn.Flags = CFG_MTU;
     brb->ConfigIn.Mtu.Min = APL2_MIN_MTU;
@@ -147,19 +216,19 @@ Apl2OpenChannel(_In_ PDEVICE_CONTEXT Ctx, _In_ const APL2_CONNECT_IN *In)
     brb->Callback = Apl2Indication;
     brb->CallbackContext = Ctx;
 
-    status = Apl2SendBrbSync(Ctx, (PBRB)brb, sizeof(*brb), 20);
+    status = Apl2SendBrbSync(Ctx, (PBRB)brb, sizeof(*brb));
     Ctx->LastStatus = status;
     if (NT_SUCCESS(status)) {
         WdfSpinLockAcquire(Ctx->Lock);
         Ctx->Channel = brb->ChannelHandle;
         Ctx->State = APL2_STATE_CONNECTED;
-        Ctx->Psm = psm;
+        Ctx->Owner = File;
+        Ctx->Psm = APL2_DEFAULT_PSM;
         Ctx->InMtu = brb->InResults.Params.Mtu;
         Ctx->OutMtu = brb->OutResults.Params.Mtu;
         WdfSpinLockRelease(Ctx->Lock);
     }
-    APL2_LOG("open channel psm 0x%04X flags 0x%08X: 0x%08X (in %u out %u)", psm, brb->ChannelFlags, status,
-             brb->InResults.Params.Mtu, brb->OutResults.Params.Mtu);
+    APL2_LOG("open channel: 0x%08X (in %u out %u)", status, brb->InResults.Params.Mtu, brb->OutResults.Params.Mtu);
     Ctx->Bth.BthFreeBrb((PBRB)brb);
     return status;
 }
@@ -210,6 +279,7 @@ Apl2EvtDeviceAdd(_In_ WDFDRIVER Driver, _Inout_ PWDFDEVICE_INIT DeviceInit)
     RtlZeroMemory(ctx, sizeof(*ctx));
     ctx->Device = device;
     ctx->IoTarget = WdfDeviceGetIoTarget(device);
+    KeInitializeEvent(&ctx->NoTransfers, NotificationEvent, TRUE);
 
     WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
     attrs.ParentObject = device;
@@ -218,6 +288,10 @@ Apl2EvtDeviceAdd(_In_ WDFDRIVER Driver, _Inout_ PWDFDEVICE_INIT DeviceInit)
         return status;
     }
     status = WdfWaitLockCreate(&attrs, &ctx->ConnectLock);
+    if (!NT_SUCCESS(status)) {
+        return status;
+    }
+    status = WdfCollectionCreate(&attrs, &ctx->InFlight);
     if (!NT_SUCCESS(status)) {
         return status;
     }
@@ -288,8 +362,15 @@ VOID
 Apl2EvtFileCleanup(_In_ WDFFILEOBJECT FileObject)
 {
     PDEVICE_CONTEXT ctx = GetCtx(WdfFileObjectGetDevice(FileObject));
+    BOOLEAN mine;
+
     WdfWaitLockAcquire(ctx->ConnectLock, NULL);
-    (void)Apl2CloseChannel(ctx);
+    WdfSpinLockAcquire(ctx->Lock);
+    mine = (ctx->Owner == FileObject);
+    WdfSpinLockRelease(ctx->Lock);
+    if (mine) {                         /* other handles (e.g. an info-only probe) never close the channel */
+        (void)Apl2CloseChannel(ctx);
+    }
     WdfWaitLockRelease(ctx->ConnectLock);
 }
 
@@ -313,6 +394,7 @@ Apl2TransferComplete(_In_ WDFREQUEST Request, _In_ WDFIOTARGET Target,
             InterlockedIncrement(&ctx->Writes);
         }
     }
+    Apl2Untrack(ctx, Request);
     WdfRequestCompleteWithInformation(Request, status, info);
 }
 
@@ -321,26 +403,38 @@ Apl2SubmitTransfer(_In_ WDFQUEUE Queue, _In_ WDFREQUEST Request, _In_ size_t Len
 {
     PDEVICE_CONTEXT ctx = GetCtx(WdfIoQueueGetDevice(Queue));
     PREQUEST_CONTEXT rc = GetReqCtx(Request);
+    WDFFILEOBJECT file = WdfRequestGetFileObject(Request);
     L2CAP_CHANNEL_HANDLE h = NULL;
     WDF_OBJECT_ATTRIBUTES attrs;
     WDFMEMORY mem;
     PMDL mdl = NULL;
     NTSTATUS status;
+    BOOLEAN closing;
 
-    WdfSpinLockAcquire(ctx->Lock);
-    if (ctx->State == APL2_STATE_CONNECTED) {
-        h = ctx->Channel;
-    }
-    WdfSpinLockRelease(ctx->Lock);
-    if (h == NULL) {
-        WdfRequestComplete(Request, STATUS_DEVICE_NOT_CONNECTED);
-        return;
-    }
     if (Length == 0 || Length > MAXULONG) {
         WdfRequestComplete(Request, STATUS_INVALID_BUFFER_SIZE);
         return;
     }
     status = In ? WdfRequestRetrieveOutputWdmMdl(Request, &mdl) : WdfRequestRetrieveInputWdmMdl(Request, &mdl);
+    if (!NT_SUCCESS(status)) {
+        WdfRequestComplete(Request, status);
+        return;
+    }
+
+    /* take the handle and register the transfer in one step, so a close cannot slip in between */
+    WdfSpinLockAcquire(ctx->Lock);
+    if (ctx->Owner != NULL && ctx->Owner != file) {
+        status = STATUS_ACCESS_DENIED;
+    } else if (ctx->State != APL2_STATE_CONNECTED || ctx->Closing || ctx->Channel == NULL) {
+        status = STATUS_DEVICE_NOT_CONNECTED;
+    } else {
+        status = WdfCollectionAdd(ctx->InFlight, Request);
+        if (NT_SUCCESS(status)) {
+            h = ctx->Channel;
+            KeClearEvent(&ctx->NoTransfers);
+        }
+    }
+    WdfSpinLockRelease(ctx->Lock);
     if (!NT_SUCCESS(status)) {
         WdfRequestComplete(Request, status);
         return;
@@ -362,13 +456,27 @@ Apl2SubmitTransfer(_In_ WDFQUEUE Queue, _In_ WDFREQUEST Request, _In_ size_t Len
                                                                 mem, NULL, NULL, NULL, NULL, NULL);
     }
     if (!NT_SUCCESS(status)) {
+        Apl2Untrack(ctx, Request);
         WdfRequestComplete(Request, status);
         return;
     }
     WdfRequestSetCompletionRoutine(Request, Apl2TransferComplete, ctx);
+
+    WdfObjectReference(Request);        /* still valid for the closing check below, even if it completes */
     if (!WdfRequestSend(Request, ctx->IoTarget, WDF_NO_SEND_OPTIONS)) {
-        WdfRequestComplete(Request, WdfRequestGetStatus(Request));
+        status = WdfRequestGetStatus(Request);
+        Apl2Untrack(ctx, Request);
+        WdfRequestComplete(Request, status);
+    } else {
+        /* a close that started while we were sending may have missed this request: cancel it ourselves */
+        WdfSpinLockAcquire(ctx->Lock);
+        closing = ctx->Closing;
+        WdfSpinLockRelease(ctx->Lock);
+        if (closing) {
+            (void)WdfRequestCancelSentRequest(Request);
+        }
     }
+    WdfObjectDereference(Request);
 }
 
 VOID
@@ -388,6 +496,7 @@ Apl2EvtIoDeviceControl(_In_ WDFQUEUE Queue, _In_ WDFREQUEST Request, _In_ size_t
                        _In_ size_t InputBufferLength, _In_ ULONG IoControlCode)
 {
     PDEVICE_CONTEXT ctx = GetCtx(WdfIoQueueGetDevice(Queue));
+    WDFFILEOBJECT file = WdfRequestGetFileObject(Request);
     NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
     ULONG_PTR info = 0;
 
@@ -405,6 +514,8 @@ Apl2EvtIoDeviceControl(_In_ WDFQUEUE Queue, _In_ WDFREQUEST Request, _In_ size_t
             out->Psm = ctx->Psm;
             out->InMtu = ctx->InMtu;
             out->OutMtu = ctx->OutMtu;
+            out->Flags = (ctx->Owner != NULL ? APL2_INFO_IN_USE : 0) |
+                         (ctx->Owner != NULL && ctx->Owner == file ? APL2_INFO_MINE : 0);
             WdfSpinLockRelease(ctx->Lock);
             out->RemoteAddr = ctx->Remote;
             out->LastStatus = ctx->LastStatus;
@@ -425,15 +536,24 @@ Apl2EvtIoDeviceControl(_In_ WDFQUEUE Queue, _In_ WDFREQUEST Request, _In_ size_t
             in = *p;
         }
         WdfWaitLockAcquire(ctx->ConnectLock, NULL);
-        status = Apl2OpenChannel(ctx, &in);
+        status = Apl2OpenChannel(ctx, file, &in);
         WdfWaitLockRelease(ctx->ConnectLock);
         break;
     }
-    case IOCTL_APL2_DISCONNECT:
+    case IOCTL_APL2_DISCONNECT: {
+        WDFFILEOBJECT owner;
         WdfWaitLockAcquire(ctx->ConnectLock, NULL);
-        status = Apl2CloseChannel(ctx);
+        WdfSpinLockAcquire(ctx->Lock);
+        owner = ctx->Owner;
+        WdfSpinLockRelease(ctx->Lock);
+        if (owner != NULL && owner != file) {
+            status = STATUS_ACCESS_DENIED;      /* only the owner may close the channel */
+        } else {
+            status = Apl2CloseChannel(ctx);
+        }
         WdfWaitLockRelease(ctx->ConnectLock);
         break;
+    }
     default:
         break;
     }
