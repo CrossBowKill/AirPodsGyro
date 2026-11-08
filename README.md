@@ -3,8 +3,10 @@
 Use AirPods Pro 3 as a head tracker for racing and flight sims on a Windows PC, natively over the PC's own
 Bluetooth, with no Raspberry Pi, phone or OpenTrack needed. The AirPods keep playing PC audio while they track.
 
-**Status (2026-11-08):** works end to end, but **only with Windows test-signing mode on** (Secure Boot off).
-That rules out games protected by Easy Anti-Cheat. See [Limiting factor](#limiting-factor).
+**Status (2026-11-08):** the app works and has been proven end to end with real AirPods. **The Windows driver is
+paused.** It only loads with Windows test-signing mode on (Secure Boot off), which rules out games protected by Easy
+Anti-Cheat ([Limiting factor](#limiting-factor)). It also hasn't passed an independent review yet
+([Driver status](#driver-status-paused)). The app itself, and trying it with the bundled recordings, are unaffected.
 
 ![AirPodsGyro live view: AirPods Pro 3 streaming at 100 Hz, head turned 35° right and 14° down](docs/screenshots/live-dark.png)
 
@@ -34,7 +36,7 @@ To regenerate them: `.venv\Scripts\python airpodsgyro\tests\readme_shots.py`. Th
 | Game output: built-in TrackIR / FreeTrack (opentrack's client DLLs), optional OpenTrack UDP | `airpodsgyro/outputs/` | verified by reading back through `NPClient64.dll` |
 | Desktop app: status, live head view, calibration wizard, settings, tray, in-game hotkeys | `airpodsgyro/app.py`, `airpodsgyro/gui/` | done |
 | Packaged app: `AirPodsGyro.exe` (self-tests itself at build time) | `airpodsgyro/packaging/build.py` → `dist/` | done |
-| Windows kernel driver: opens the AirPods' head-tracking channel (L2CAP PSM 0x1001) | `driver/` | **works live: 100 Hz, audio keeps playing** |
+| Windows kernel driver: opens the AirPods' head-tracking channel (L2CAP PSM 0x1001) | `driver/` | worked live (100 Hz, audio kept playing); **paused**, see [Driver status](#driver-status-paused) |
 
 Not yet tested: in-game use (blocked by Easy Anti-Cheat, see below), long sessions on Windows, reconnect after taking
 the AirPods out. Details for developers: [`airpodsgyro/README.md`](airpodsgyro/README.md).
@@ -47,7 +49,7 @@ There are three levels. Each one builds on the one before.
 | --- | --- | --- |
 | [1. Try the app without AirPods](#1-try-the-app-without-airpods) | Windows 10/11, Python 3.12+ | none |
 | [2. Build the .exe](#2-build-the-exe) | the same | none |
-| [3. Use it with your AirPods](#3-use-it-with-your-airpods) | AirPods Pro (tested: Pro 3), Visual Studio 2022 | test-signing mode, a kernel driver |
+| [3. Use it with your AirPods](#3-use-it-with-your-airpods) (**paused, not recommended**) | AirPods Pro (tested: Pro 3), Visual Studio 2022 | test-signing mode, a kernel driver |
 
 The app has been tested with Python 3.14 on Windows 11. Run the commands below in PowerShell from the repository
 folder.
@@ -91,9 +93,10 @@ fails unless the .exe passes its own self-test. `dist/` is not in git, so build 
 
 ### 3. Use it with your AirPods
 
-> **Read [Limiting factor](#limiting-factor) first.** The driver is test-signed. It only loads with Secure Boot off
-> and Windows test-signing mode on, and games with Easy Anti-Cheat refuse to start in that state. Everything below
-> can be undone.
+> **Paused: don't install the driver on a PC you care about.** It hasn't passed an independent review (see
+> [Driver status](#driver-status-paused)). It also only loads with Secure Boot off and test-signing mode on, which
+> Easy Anti-Cheat games refuse (see [Limiting factor](#limiting-factor)). The steps below are kept for reference and
+> for development; everything in them can be undone.
 
 #### Once: prepare Windows
 
@@ -193,6 +196,24 @@ No existing signed driver solves this either (checked 2026-11-08):
   workaround, may be flagged by anti-cheat, and needs Defender turned off. Not recommended.
 - **librepods-windowsbridge**: its own driver, also test-signed only.
 - Neither one gives other programs access to head-tracking data.
+
+## Driver status: paused
+
+On 2026-11-08 the driver worked live on one PC: 100 Hz head tracking while the AirPods kept playing audio. Then
+two independent adversarial reviews returned **DO NOT SHIP**. The first review's ten findings were fixed (including
+a signing key that stayed usable after install and a race in the kernel code). The second review found new issues,
+and the project paused the driver instead of patching further. Open findings:
+
+| Severity | Issue | Where |
+| --- | --- | --- |
+| High | The installer's staging folder sits under `C:\ProgramData`, where a normal user can pre-create the parent folder. While the installer waits at its prompt, such a process could swap the checked package for its own certificate and driver. | `driver/install.ps1` |
+| High (untested) | Sleep, hibernate or a driver update with the channel open: the pending read is only released at device cleanup. That could hang the power transition and crash Windows (bugcheck 0x9F). | `driver/AirPodsL2cap/driver.c` |
+| Medium (untested) | Connecting to AirPods that are out of range can block indefinitely; the app's timeout can't cancel it. | `driver.c`, `windriver.py` |
+| Medium | Updating picks the wrong "newest" package, because the build stamps the time of day as the version number. | `driver/install.ps1` |
+| Low | Closing continues after a 5-second drain timeout; when the user's AirPods are busy, "auto" falls back to another paired Apple device; another local user can take the channel first. | `driver.c`, `windriver.py` |
+
+To resume, fix these first, then run a third independent review. A Microsoft-signed driver would also remove the
+test-mode requirement (see [What would be needed for EAC games](#what-would-be-needed-for-eac-games)).
 
 ## What would be needed for EAC games
 
