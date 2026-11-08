@@ -16,7 +16,7 @@
 - 2026-11-05: Check Pro 3 on Linux (Ubuntu live USB) before any Windows work. End goal is a native Windows driver plus an app with OpenTrack-style output built in. Use onboard BT, no dongle.
 
 ## Blockers
-- (none)
+- 2026-11-08: GUI app tracks live with music playing, BUT user's games all use EasyAntiCheat, which won't run without Secure Boot / with test mode. Test-signed driver only loads with Secure Boot off + testsigning on -> unusable in those games. Real fix = Microsoft attestation signing (EV code-signing cert + Partner Center hardware account). Awaiting user decision.
 
 ## Project Profile (added 2026-11-05, Claudify install)
 - **Goal:** one Windows-friendly AirPods head tracker for racing/flight sims, merging mousepods (sensor/protocol work, MotionEngine, OneEuro filter, web UI) with pods-head-tracker (OpenTrack bridge, calibration, FreePIE UDP + Hatire serial). No Raspberry Pi.
